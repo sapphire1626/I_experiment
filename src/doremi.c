@@ -16,12 +16,19 @@ int secToN(double sec) {
 int main(int argc, char* argv[]) {
   int n = atoi(argv[1]);
   // C4から始める
-  double base_freq = 261.625565;  // C4の周波数
+  const double base_freq = 261.625565;  // C4の周波数
+
+  double freq = base_freq;
+
   for (int i = 0; i < n; i++) {
-    double freq = base_freq * pow(2.0, (double)i / 12.0);
     char command[256];
     snprintf(command, sizeof(command), "./build/sin 10000 %d %d", (int)freq,
              secToN(0.3));
     system(command);
+
+    freq *= pow(2.0, 1.0 / 12.0); // 半音上げる
+    if (!(i % 7 == 2 || i % 7 == 6)){
+      freq *= pow(2.0, 1.0 / 12.0); 
+    }
   }
 }
