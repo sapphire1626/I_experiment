@@ -3,11 +3,12 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#define N 256
 /**
  * ファイルパスをうけとり、バイト列をインデックス付きで出力する
+ * @example ./build/read_data ./data/sound.raw > ./data/sound.data
  */
 int main(int argc, char* argv[]) {
-  unsigned char buf;
   int fd = open(argv[1], O_RDONLY);
   if (fd < 0) {
     perror("open");
@@ -16,8 +17,11 @@ int main(int argc, char* argv[]) {
 
   int cnt = 0;
   int read_res;
-  while ((read_res = read(fd, &buf, 1)) > 0) {
-    printf("%d %d\n", cnt++, buf);
+  unsigned char buf[N];
+  while ((read_res = read(fd, &buf, N)) > 0) {
+    for(int i = 0; i < read_res; i++){
+      printf("%d %d\n", cnt++, buf[i]);
+    }
   }
   if (read_res < 0) {
     perror("read");

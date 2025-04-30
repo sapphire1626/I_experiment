@@ -9,6 +9,8 @@ int secToN(double sec){
 /**
  * @brief 音階バイナリ値を標準出力に出力する
  * argv[1]: 音階個数
+ * @example ./build/doremi 10 | play -t raw -b 16 -c 1 -e s -r 44100 -
+ * @example ./build/doremi 10 > ./data/doremi.raw
  */
 int main(int argc, char* argv[]) {
     int n = atoi(argv[1]);
@@ -17,7 +19,7 @@ int main(int argc, char* argv[]) {
     for(int i = 0; i < n; i++){
         double freq = base_freq * pow(2.0, (double)i / 12.0);
         char command[256];
-        snprintf(command, sizeof(command), "./sin 10000 %d %d", (int)freq, secToN(0.3));
+        snprintf(command, sizeof(command), "./build/sin 10000 %d %d", (int)freq, secToN(0.3));
         system(command);
     }
 }

@@ -9,6 +9,8 @@
  * argv[2]: 正弦波周波数
  * argv[3]: プロット数
  * サンプリング周波数は44100Hz固定
+ * @example ./build/sin 10000 440 88200 | play -t raw -b 16 -c 1 -e s -r 44100 -
+ * @example ./build/sin 10000 440 88200 > ./data/sin.raw
  */
 int main(int argc, char *argv[]) { 
     double sampling_rate = 44100;
