@@ -1,0 +1,2 @@
+plot "sound.bin" with linespoints
+pause -1

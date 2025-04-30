@@ -1,0 +1,24 @@
+#include <math.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <unistd.h>
+/**
+ * @brief 正弦波のサンプリング値（バイナリ）を標準出力に出力する
+ * argv[1]: 振幅
+ * argv[2]: 正弦波周波数
+ * argv[3]: プロット数
+ * サンプリング周波数は44100Hz固定
+ */
+int main(int argc, char *argv[]) { 
+    double sampling_rate = 44100;
+    double A = atoi(argv[1]);
+    double f = atoi(argv[2]);
+    int n = atoi(argv[3]);
+    for(int i = 0; i < n; i++){
+        double t = (double)i / sampling_rate;
+        double th = 2 * M_PI * f * t;
+        int16_t val = A * sin(th);
+        write(STDOUT_FILENO, &val, sizeof(val));
+    }
+}
