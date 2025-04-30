@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #define N 256
+
 /**
  * ファイルパスをうけとり、２バイト列をインデックス付きで出力する
  * @example ./build/read_data2 ./data/doremi.raw > ./data/doremi.data
@@ -19,7 +20,7 @@ int main(int argc, char* argv[]) {
   int read_res;
   int16_t buf[N];
   while ((read_res = read(fd, &buf, sizeof(buf))) > 0) {
-    for(int i = 0; i < read_res / sizeof(int16_t); i++){
+    for (int i = 0; i < read_res / sizeof(int16_t); i++) {
       printf("%d %d\n", cnt++, buf[i]);
     }
   }
