@@ -1,1 +1,1 @@
-find $(dirname $0)/../src/ -iname '*.h' -o -iname '*.c' | xargs clang-format -i
+find $(dirname $0)/../src/ -iname '*.h' -o -iname '*.c' | xargs clang-format-17 -i
