@@ -26,9 +26,9 @@ int main(int argc, char* argv[]) {
              secToN(0.3));
     system(command);
 
-    freq *= pow(2.0, 1.0 / 12.0); // 半音上げる
-    if (!(i % 7 == 2 || i % 7 == 6)){
-      freq *= pow(2.0, 1.0 / 12.0); 
+    freq *= pow(2.0, 1.0 / 12.0);  // 半音上げる
+    if (!(i % 7 == 2 || i % 7 == 6)) {
+      freq *= pow(2.0, 1.0 / 12.0);
     }
   }
 }

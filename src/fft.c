@@ -1,8 +1,8 @@
-/* 
+/*
  * fft.c
  * 使い方
  *   ./fft n
- * 
+ *
  * 以下を繰り返す:
  *   標準入力から, 16 bit integerをn個読む
  *   FFTする
@@ -10,27 +10,27 @@
  *   標準出力へ出す
  *
  * したがって「ほぼ何もしない」フィルタになる
- * 
+ *
  */
 #include <assert.h>
 #include <complex.h>
 #include <math.h>
-#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 typedef short sample_t;
 
-void die(char * s) {
-  perror(s); 
+void die(char* s) {
+  perror(s);
   exit(1);
 }
 
 /* fd から 必ず n バイト読み, bufへ書く.
    n バイト未満でEOFに達したら, 残りは0で埋める.
    fd から読み出されたバイト数を返す */
-ssize_t read_n(int fd, ssize_t n, void * buf) {
+ssize_t read_n(int fd, ssize_t n, void* buf) {
   ssize_t re = 0;
   while (re < n) {
     ssize_t r = read(fd, buf + re, n - re);
@@ -43,7 +43,7 @@ ssize_t read_n(int fd, ssize_t n, void * buf) {
 }
 
 /* fdへ, bufからnバイト書く */
-ssize_t write_n(int fd, ssize_t n, void * buf) {
+ssize_t write_n(int fd, ssize_t n, void* buf) {
   ssize_t wr = 0;
   while (wr < n) {
     ssize_t w = write(fd, buf + wr, n - wr);
@@ -54,17 +54,13 @@ ssize_t write_n(int fd, ssize_t n, void * buf) {
 }
 
 /* 標本(整数)を複素数へ変換 */
-void sample_to_complex(sample_t * s, 
-		       complex double * X, 
-		       long n) {
+void sample_to_complex(sample_t* s, complex double* X, long n) {
   long i;
   for (i = 0; i < n; i++) X[i] = s[i];
 }
 
 /* 複素数を標本(整数)へ変換. 虚数部分は無視 */
-void complex_to_sample(complex double * X, 
-		       sample_t * s, 
-		       long n) {
+void complex_to_sample(complex double* X, sample_t* s, long n) {
   long i;
   for (i = 0; i < n; i++) {
     s[i] = creal(X[i]);
@@ -78,31 +74,27 @@ void complex_to_sample(complex double * X,
    xが入力でyが出力.
    xも破壊される
  */
-void fft_r(complex double * x, 
-	   complex double * y, 
-	   long n, 
-	   complex double w) {
-  if (n == 1) { y[0] = x[0]; }
-  else {
-    complex double W = 1.0; 
+void fft_r(complex double* x, complex double* y, long n, complex double w) {
+  if (n == 1) {
+    y[0] = x[0];
+  } else {
+    complex double W = 1.0;
     long i;
-    for (i = 0; i < n/2; i++) {
-      y[i]     =     (x[i] + x[i+n/2]); /* 偶数行 */
-      y[i+n/2] = W * (x[i] - x[i+n/2]); /* 奇数行 */
+    for (i = 0; i < n / 2; i++) {
+      y[i] = (x[i] + x[i + n / 2]);             /* 偶数行 */
+      y[i + n / 2] = W * (x[i] - x[i + n / 2]); /* 奇数行 */
       W *= w;
     }
-    fft_r(y,     x,     n/2, w * w);
-    fft_r(y+n/2, x+n/2, n/2, w * w);
-    for (i = 0; i < n/2; i++) {
-      y[2*i]   = x[i];
-      y[2*i+1] = x[i+n/2];
+    fft_r(y, x, n / 2, w * w);
+    fft_r(y + n / 2, x + n / 2, n / 2, w * w);
+    for (i = 0; i < n / 2; i++) {
+      y[2 * i] = x[i];
+      y[2 * i + 1] = x[i + n / 2];
     }
   }
 }
 
-void fft(complex double * x, 
-	 complex double * y, 
-	 long n) {
+void fft(complex double* x, complex double* y, long n) {
   long i;
   double arg = 2.0 * M_PI / n;
   complex double w = cos(arg) - 1.0j * sin(arg);
@@ -110,9 +102,7 @@ void fft(complex double * x,
   for (i = 0; i < n; i++) y[i] /= n;
 }
 
-void ifft(complex double * y, 
-	  complex double * x, 
-	  long n) {
+void ifft(complex double* y, complex double* x, long n) {
   double arg = 2.0 * M_PI / n;
   complex double w = cos(arg) + 1.0j * sin(arg);
   fft_r(y, x, n, w);
@@ -127,30 +117,26 @@ int pow2check(long N) {
   return 1;
 }
 
-void print_complex(FILE * wp, 
-		   complex double * Y, long n) {
+void print_complex(FILE* wp, complex double* Y, long n) {
   long i;
   for (i = 0; i < n; i++) {
-    fprintf(wp, "%ld %f %f %f %f\n", 
-	    i, 
-	    creal(Y[i]), cimag(Y[i]),
-	    cabs(Y[i]), atan2(cimag(Y[i]), creal(Y[i])));
+    fprintf(wp, "%ld %f %f %f %f\n", i, creal(Y[i]), cimag(Y[i]), cabs(Y[i]),
+            atan2(cimag(Y[i]), creal(Y[i])));
   }
 }
 
-
-int main(int argc, char ** argv) {
+int main(int argc, char** argv) {
   (void)argc;
   long n = atol(argv[1]);
   if (!pow2check(n)) {
     fprintf(stderr, "error : n (%ld) not a power of two\n", n);
     exit(1);
   }
-  FILE * wp = fopen("fft.dat", "wb");
+  FILE* wp = fopen("fft.dat", "wb");
   if (wp == NULL) die("fopen");
-  sample_t * buf = calloc(sizeof(sample_t), n);
-  complex double * X = calloc(sizeof(complex double), n);
-  complex double * Y = calloc(sizeof(complex double), n);
+  sample_t* buf = calloc(sizeof(sample_t), n);
+  complex double* X = calloc(sizeof(complex double), n);
+  complex double* Y = calloc(sizeof(complex double), n);
   while (1) {
     /* 標準入力からn個標本を読む */
     ssize_t m = read_n(0, n * sizeof(sample_t), buf);
@@ -159,7 +145,7 @@ int main(int argc, char ** argv) {
     sample_to_complex(buf, X, n);
     /* FFT -> Y */
     fft(X, Y, n);
-    
+
     print_complex(wp, Y, n);
     fprintf(wp, "----------------\n");
 
