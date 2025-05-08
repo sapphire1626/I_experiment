@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
     }
 
     if (i % rate == 0) {
-      write(STDOUT_FILENO, &buf[0], 2);
+      int _ = write(STDOUT_FILENO, &buf[0], 2);
     }
     ++i;
   }
