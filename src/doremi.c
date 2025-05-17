@@ -1,4 +1,3 @@
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -14,21 +13,27 @@ int secToN(double sec) {
  * @example ./build/doremi 10 > ./data/doremi.raw
  */
 int main(int argc, char* argv[]) {
-  int n = atoi(argv[1]);
-  // C4から始める
-  const double base_freq = 261.625565;  // C4の周波数
+  const int n = atoi(argv[1]);
 
-  double freq = base_freq;
+  const int sound_strength = 10000;
+  const double sound_duration = 0.3;  // 一音の継続時間 [秒]
+
+  char sound_code[3] = "C4";
 
   for (int i = 0; i < n; i++) {
     char command[256];
-    snprintf(command, sizeof(command), "./build/sin 10000 %d %d", (int)freq,
-             secToN(0.3));
+    snprintf(command, sizeof(command), "./build/sin %d %s %d", sound_strength,
+             sound_code, secToN(sound_duration));
     system(command);
 
-    freq *= pow(2.0, 1.0 / 12.0);  // 半音上げる
-    if (!(i % 7 == 2 || i % 7 == 6)) {
-      freq *= pow(2.0, 1.0 / 12.0);
+    if (sound_code[0] == 'B') {
+      sound_code[1]++;
+    }
+
+    if (sound_code[0] == 'G') {
+      sound_code[0] = 'A';
+    } else {
+      sound_code[0]++;
     }
   }
 }
