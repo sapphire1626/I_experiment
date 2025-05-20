@@ -120,12 +120,40 @@ int freqToIndex(double f, int n) {
   return n * f / F_SAMPLE;
 }
 
+void bandpass(complex double* Y, double lower_freq, double upper_freq, int n) {
+  const int lower_idx = freqToIndex(lower_freq, n);
+  const int upper_idx = freqToIndex(upper_freq, n);
+  memset(&Y[upper_idx], 0, (n - upper_idx) * sizeof(complex double));
+  memset(Y, 0, lower_idx * sizeof(complex double));
+}
+
+void noiseCut(complex double* Y, double thres, int n) {
+  for (int i = 0; i < n; i++) {
+    if (cabs(Y[i]) < thres) {
+      Y[i] = 0;
+    }
+  }
+}
+
+void masking(complex double* Y, double thres, int n) {
+  for (int i = 0; i < n; i++) {
+    if (cabs(Y[i]) > thres) {
+      for (int j = -10; j < 10; j++) {
+        if (i + j >= 0 && i + j < n && cabs(Y[i + j]) < cabs(Y[i])) {
+          Y[i + j] = 0;
+        }
+      }
+    }
+  }
+}
+
 /// @brief 標準入力の波をバンドパスフィルタして標準出力に出す
 /// @param argv[1]: FFTのサンプル数
 /// @param argv[2]: 下限周波数
 /// @param argv[3]: 上限周波数
 /// @note 音源のサンプリング周波数は44100Hz固定
-/// @example sox ./data/doremi.wav -t raw -c 1 - | ./bandpass 8192 300 3400 | play -t raw -b 16 -c 1 -e s -r 44100 -
+/// @example sox ./data/doremi.wav -t raw -c 1 - | ./bandpass 8192 300 3400 |
+/// play -t raw -b 16 -c 1 -e s -r 44100 -
 int main(int argc, char** argv) {
   (void)argc;
   long n = atol(argv[1]);
@@ -133,8 +161,8 @@ int main(int argc, char** argv) {
     fprintf(stderr, "error : n (%ld) not a power of two\n", n);
     exit(1);
   }
-  const long cut_lower_idx = freqToIndex(atol(argv[2]), n);
-  const long cut_upper_idx = freqToIndex(atol(argv[3]), n);
+  const double lower_freq = atol(argv[2]);
+  const double upper_freq = atol(argv[3]);
 
   FILE* wp = fopen("fft.dat", "wb");
   if (wp == NULL) die("fopen");
@@ -150,9 +178,9 @@ int main(int argc, char** argv) {
     /* FFT -> Y */
     fft(X, Y, n);
 
-    // fill 0
-    memset(&Y[cut_upper_idx], 0, (n - cut_upper_idx) * sizeof(complex double));
-    memset(Y, 0, cut_lower_idx * sizeof(complex double));
+    bandpass(Y, lower_freq, upper_freq, n);
+    noiseCut(Y, 5, n);
+    // masking(Y, 300, n);
 
     print_complex(wp, Y, n);
     fprintf(wp, "----------------\n");
