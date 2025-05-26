@@ -19,13 +19,13 @@ int setUpSocketTcp(struct sockaddr_in* addr, const char* ip_addr, int port) {
 
   setUpSockaddr(addr, ip_addr, port);
 
-  printf("connecting...\n");
+  // printf("connecting...\n");
   int ret = connect(s, (struct sockaddr*)addr, sizeof(*addr));
   if (ret < 0) {
     perror("connect");
     exit(1);
   }
-  printf("connected\n");
+  // printf("connected\n");
 
   return s;
 }
@@ -50,4 +50,26 @@ void setUpSockaddr(struct sockaddr_in* addr, const char* ip_addr, int port) {
   }
 
   addr->sin_port = htons(port);
+}
+
+int setUpSocketTcpServer(struct sockaddr_in* addr, int port) {
+  int s = socket(PF_INET, SOCK_STREAM, 0);
+  if (s < 0) {
+    perror("socket");
+    exit(1);
+  }
+
+  addr->sin_family = AF_INET;  // IPv4
+  addr->sin_port = htons(port);
+  addr->sin_addr.s_addr = INADDR_ANY;  // 任意のIPアドレスで待ち受け
+  if (bind(s, (struct sockaddr*)addr, sizeof(*addr)) < 0) {
+    perror("bind");
+    exit(1);
+  }
+  if (listen(s, 10) < 0) {
+    perror("listen");
+    exit(1);
+  }
+
+  return s;
 }

@@ -10,3 +10,9 @@ int setUpSocketTcp(struct sockaddr_in* addr, const char* ip_addr, int port);
 int setUpSocketUdp(struct sockaddr_in* addr, const char* ip_addr, int port);
 
 void setUpSockaddr(struct sockaddr_in* addr, const char* ip_addr, int port);
+
+/// @brief bind, listenまでおこなう
+/// @param addr
+/// @param port
+/// @return socketのファイルディスクリプタを返す
+int setUpSocketTcpServer(struct sockaddr_in* addr, int port);
