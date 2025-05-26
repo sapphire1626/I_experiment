@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
     double t = (double)i / sampling_rate;
     double th = 2 * M_PI * f * t;
     int16_t val = A * sin(th);
-    write(STDOUT_FILENO, &val, sizeof(val));
+    int _ = write(STDOUT_FILENO, &val, sizeof(val));
   }
 }
 

@@ -24,7 +24,7 @@ int main(int argc, char* argv[]) {
     char command[256];
     snprintf(command, sizeof(command), "./build/sin %d %s %d", sound_strength,
              sound_code, secToN(sound_duration));
-    system(command);
+    int _ = system(command);
 
     if (sound_code[0] == 'B') {
       sound_code[1]++;
