@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   addr.sin_port = htons(port);
-  printf("connetinng...\n");
+  printf("connecting...\n");
   int ret = connect(s, (struct sockaddr*)&addr, sizeof(addr));
   if (ret < 0) {
     perror("connect");
