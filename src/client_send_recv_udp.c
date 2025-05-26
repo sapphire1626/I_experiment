@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
   // 送信
   // １回1000バイトまで、最大50回
   int count = 0;
-  while (c = read(STDIN_FILENO, buf, sizeof(buf))) {
+  while ((c = read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
     if (++count > 50) {
       break;  // 最大50回送信
     }
@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
   shutdown(s, SHUT_WR);  // 送信はこれ以上しないことを相手に通知
 
   // 受信
-  while (c = recvfrom(s, buf, sizeof(buf), 0, addr, &addr_len)) {
+  while ((c = recvfrom(s, buf, sizeof(buf), 0, addr, &addr_len)) > 0) {
     if (c == sizeof(buf) && checkAllOf(buf, c, 0b11111111)) {
       break;  // 受信したデータが全て1なら終了
     }

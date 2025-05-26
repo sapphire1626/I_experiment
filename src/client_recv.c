@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
 
   char buf[256];
   int c;
-  while (c = read(s, buf, sizeof(buf))) {
+  while ((c = read(s, buf, sizeof(buf))) > 0) {
     int _ = write(STDOUT_FILENO, buf, c);
   }
   if (c < 0) {

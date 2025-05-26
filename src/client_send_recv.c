@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
   char buf[256];
   int c;
   // 送信
-  while (c = read(STDIN_FILENO, buf, sizeof(buf))) {
+  while ((c = read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
     if (write(s, buf, c) < 0) {
       perror("write");
       return 1;
@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
   shutdown(s, SHUT_WR);  // 送信はこれ以上しないことを相手に通知
 
   // 受信
-  while (c = read(s, buf, sizeof(buf))) {
+  while ((c = read(s, buf, sizeof(buf))) > 0) {
     if (write(STDOUT_FILENO, buf, c) < 0) {
       perror("write");
       return 1;

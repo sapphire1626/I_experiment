@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
 
   char buf[1000];
   int c;
-  while (c = recvfrom(s, buf, sizeof(buf), 0, addr, &addr_len)) {
+  while ((c = recvfrom(s, buf, sizeof(buf), 0, addr, &addr_len)) > 0) {
     if (c == sizeof(buf) && checkAllOf(buf, c, 0b11111111)) {
       break;  // 受信したデータが全て1なら終了
     }
