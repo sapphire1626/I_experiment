@@ -19,12 +19,8 @@ int main(int argc, char* argv[]) {
   const int port = atoi(argv[1]);
 
   struct sockaddr_in addr;
-  int ss = setUpSocketTcpServer(&addr, port);
-
-  struct sockaddr_in client_addr;
   socklen_t len = sizeof(struct sockaddr_in);
-  int s = accept(ss, (struct sockaddr*)&client_addr, &len);
-  close(ss);
+  int s = setUpSocketTcpServer(&addr, &len, port);
 
   char buf[256];
   int c;

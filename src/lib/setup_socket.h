@@ -13,6 +13,7 @@ void setUpSockaddr(struct sockaddr_in* addr, const char* ip_addr, int port);
 
 /// @brief bind, listenまでおこなう
 /// @param addr
+/// @param len addrのサイズのポインタ
 /// @param port
 /// @return socketのファイルディスクリプタを返す
-int setUpSocketTcpServer(struct sockaddr_in* addr, int port);
+int setUpSocketTcpServer(struct sockaddr_in* addr, socklen_t* len, int port);

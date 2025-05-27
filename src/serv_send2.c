@@ -16,7 +16,7 @@ int s;
 
 // シグナルハンドラ（受信したシグナル番号を表示）
 void sigint_handler(int sig) {
-//   fprintf(stderr, "Signal %d を受信しました。\n", sig);
+  //   fprintf(stderr, "Signal %d を受信しました。\n", sig);
   (void)pclose(fp);
   close(s);
   exit(0);
@@ -33,15 +33,10 @@ int main(int argc, char *argv[]) {
   const int port = atoi(argv[1]);
 
   struct sockaddr_in addr;
-  int ss = setUpSocketTcpServer(&addr, port);
-
-  struct sockaddr_in client_addr;
   socklen_t len = sizeof(struct sockaddr_in);
-  s = accept(ss, (struct sockaddr *)&client_addr, &len);
-  close(ss);
+  s = setUpSocketTcpServer(&addr, &len, port);
 
   char buf[256];
-
 
   char *cmdline = "rec -t raw -b 16 -c 1 -e s -r 44100 -";
   if ((fp = popen(cmdline, "r")) == NULL) {
