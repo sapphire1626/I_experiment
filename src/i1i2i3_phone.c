@@ -37,21 +37,33 @@ void finish(const char* cmd) {
 ///@param argv[1] 通信先IPアドレス
 ///@param argv[2] 通信先ポート番号
 ///@param argv[3] 受信ポート番号
+///@param argv[4] server or client
 int main(int argc, char* argv[]) {
   const char* ip_addr = argv[1];
   const int recv_port = atoi(argv[2]);
   const int send_port = atoi(argv[3]);
-  if (argc != 4) {
-    printf("Usage: %s <ip_addr> <recv_port> <send_port>\n", argv[0]);
+  const char* mode = argv[4];
+  if (argc != 5) {
+    printf("Usage: %s <ip_addr> <recv_port> <send_port> <server/client>\n",
+           argv[0]);
+    return 1;
+  }
+
+  if (strcmp(mode, "server") != 0 && strcmp(mode, "client") != 0) {
+    printf("mode must be 'server' or 'client'\n");
     return 1;
   }
 
   struct sockaddr_in addr_recv;
-  s_recv = setUpSocketTcp(&addr_recv, ip_addr, recv_port);
-
   struct sockaddr_in addr_send;
   socklen_t addr_len_send = sizeof(struct sockaddr_in);
-  s_send = setUpSocketTcpServer(&addr_send, &addr_len_send, send_port);
+  if (strcmp(mode, "server") == 0) {
+    s_send = setUpSocketTcpServer(&addr_send, &addr_len_send, send_port);
+    s_recv = setUpSocketTcp(&addr_recv, ip_addr, recv_port);
+  } else {
+    s_recv = setUpSocketTcp(&addr_recv, ip_addr, recv_port);
+    s_send = setUpSocketTcpServer(&addr_send, &addr_len_send, send_port);
+  }
 
   char* cmdline = "rec -t raw -b 16 -c 1 -e s -r 44100 -";
   if ((fp = popen(cmdline, "r")) == NULL) {

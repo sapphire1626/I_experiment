@@ -19,13 +19,13 @@ int setUpSocketTcp(struct sockaddr_in* addr, const char* ip_addr, int port) {
 
   setUpSockaddr(addr, ip_addr, port);
 
-  // printf("connecting...\n");
-  int ret = connect(s, (struct sockaddr*)addr, sizeof(*addr));
-  if (ret < 0) {
+  // connectが成功するまでリトライ
+  while (1) {
+    int ret = connect(s, (struct sockaddr*)addr, sizeof(*addr));
+    if (ret == 0) break;
     perror("connect");
-    exit(1);
+    sleep(1);
   }
-  // printf("connected\n");
 
   return s;
 }
