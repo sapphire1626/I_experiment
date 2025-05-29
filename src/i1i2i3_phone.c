@@ -2,6 +2,7 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <pthread.h>  // 追加
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +11,7 @@
 
 #include "lib/setup_socket.h"
 
+void* send_thread_func(void* arg);
 FILE* fp;
 int s_recv;
 int s_send;
@@ -65,27 +67,16 @@ int main(int argc, char* argv[]) {
     s_send = setUpSocketTcpServer(&addr_send, &addr_len_send, send_port);
   }
 
-  char* cmdline = "rec -t raw -b 16 -c 1 -e s -r 44100 -";
-  if ((fp = popen(cmdline, "r")) == NULL) {
-    perror("can not exec commad");
-    exit(EXIT_FAILURE);
+  // 送信スレッド作成
+  pthread_t send_thread;
+  if (pthread_create(&send_thread, NULL, send_thread_func, NULL) != 0) {
+    perror("pthread_create");
+    finish("pthread_create");
   }
 
   char buf[256];
   int c;
   while (1) {
-    // 送信パート
-    c = fread(buf, sizeof(buf[0]), sizeof(buf) / sizeof(buf[0]), fp);
-    if (c < 0) {
-      finish("fread");
-    }
-
-    if (c > 0) {
-      if (write(s_send, buf, c) < 0) {
-        finish("write");
-      }
-    }
-
     // 受信
     c = read(s_recv, buf, sizeof(buf));
     if (c == 0) {
@@ -100,5 +91,36 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  // スレッド終了待ち
+  pthread_cancel(send_thread);
+  pthread_join(send_thread, NULL);
+
   finish(NULL);
+}
+
+// 送信スレッド用関数
+void* send_thread_func(void* arg) {
+  char* cmdline = "rec -t raw -b 16 -c 1 -e s -r 44100 -";
+  FILE* fp_send = popen(cmdline, "r");
+  if (fp_send == NULL) {
+    perror("can not exec commad");
+    finish("popen");
+  }
+  char buf[256];
+  int c;
+  while (1) {
+    c = fread(buf, sizeof(buf[0]), sizeof(buf) / sizeof(buf[0]), fp_send);
+    if (c < 0) {
+      pclose(fp_send);
+      finish("fread");
+    }
+    if (c > 0) {
+      if (write(s_send, buf, c) < 0) {
+        pclose(fp_send);
+        finish("write");
+      }
+    }
+  }
+  pclose(fp_send);
+  return NULL;
 }
