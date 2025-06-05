@@ -13,16 +13,15 @@
 /// @param argv[1] IPアドレス
 /// @param argv[2] ポート番号
 int main(int argc, char* argv[]) {
-  // UDP => SOCK_DGRAM
-  // TCP => SOCK_STREAM
-
   if (argc != 3) {
-    printf("IPアドレスとポート教えろ");
+    printf("Usage: %s <ip_address> <port>\n", argv[0]);
+    return 1;
   }
 
   char* ip_addr = argv[1];
   int port = atof(argv[2]);
 
+  // 接続
   int s = socket(PF_INET, SOCK_STREAM, 0);
   if (s < 0) {
     perror("socket");
@@ -36,15 +35,14 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   addr.sin_port = htons(port);
-  printf("connecting...\n");
+
   int ret = connect(s, (struct sockaddr*)&addr, sizeof(addr));
   if (ret < 0) {
     perror("connect");
     return 1;
-  } else {
-    printf("connected\n");
   }
 
+  // データ受信
   char buf[256];
   int c;
   while ((c = read(s, buf, sizeof(buf))) > 0) {
@@ -54,30 +52,6 @@ int main(int argc, char* argv[]) {
     perror("read");
     return 1;
   }
-
-  // if (argc == 1) {
-  //   printf("listening...\n");
-  //   int N = 256;
-  //   char data[N];
-  //   int n = read(s, data, N);
-  //   if (n == -1) {
-  //     perror("read");
-  //     return 1;
-  //   }
-  //   printf("read %d bytes\n", n);
-  //   printf("data: %s\n", data);
-  // } else {
-  //   // sender
-  //   printf("sending...\n");
-  //   const char *msg = "hello world";
-  //   int n = send(s, msg, strlen(msg)+1, 0);
-  //   if (n < 0) {
-  //     perror("send");
-  //     return 1;
-  //   } else {
-  //     printf("sent %d bytes\n", n);
-  //   }
-  // }
 
   close(s);
   return 0;

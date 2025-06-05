@@ -24,9 +24,6 @@ int checkAllOf(char arr[], int size, char str) {
 /// @param argv[1] IPアドレス
 /// @param argv[2] ポート番号
 int main(int argc, char* argv[]) {
-  // UDP => SOCK_DGRAM
-  // TCP => SOCK_STREAM
-
   if (argc != 3) {
     printf("IPアドレスとポート教えろ");
   }
