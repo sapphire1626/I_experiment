@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "lib/encode.h"
 #include "lib/setup_socket.h"
 
 void* send_thread_func(void* arg);
@@ -83,7 +84,9 @@ int main(int argc, char* argv[]) {
       break;
     }
     if (c > 0) {
-      if (write(STDOUT_FILENO, buf, c) < 0) {
+      char decoded_buf[1024];
+      int decoded_len = decode(buf, c, decoded_buf);
+      if (write(STDOUT_FILENO, decoded_buf, decoded_len) < 0) {
         finish("write");
       }
     } else if (c < 0) {
@@ -115,7 +118,10 @@ void* send_thread_func(void* arg) {
       finish("fread");
     }
     if (c > 0) {
-      if (write(s_send, buf, c) < 0) {
+      char encoded_buf[512];
+      int encoded_len = encode(buf, c, encoded_buf);
+
+      if (write(s_send, encoded_buf, encoded_len) < 0) {
         pclose(fp_send);
         finish("write");
       }
