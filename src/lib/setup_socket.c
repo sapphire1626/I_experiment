@@ -83,3 +83,20 @@ int setUpSocketTcpServer(struct sockaddr_in* addr, socklen_t* len, int port) {
 
   return s;
 }
+
+int setUpSocketUdpServer(struct sockaddr_in* addr, socklen_t* len, int port) {
+  int s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (s < 0) {
+    perror("socket");
+    exit(1);
+  }
+  addr->sin_family = AF_INET;
+  addr->sin_port = htons(port);
+  addr->sin_addr.s_addr = INADDR_ANY;
+  if (bind(s, (struct sockaddr*)addr, sizeof(*addr)) < 0) {
+    perror("bind");
+    exit(1);
+  }
+  if (len) *len = sizeof(struct sockaddr_in);
+  return s;
+}

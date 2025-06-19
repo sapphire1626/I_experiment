@@ -51,19 +51,13 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  // struct sockaddr_in addr_recv;
-  // struct sockaddr_in addr_send;
-  // socklen_t addr_len_send = sizeof(struct sockaddr_in);
+  const char* protocol = "tcp";
   if (strcmp(mode, "server") == 0) {
-    setupSend(send_port);
-    setupReceive(ip_addr, recv_port);
-    // s_send = setUpSocketTcpServer(&addr_send, &addr_len_send, send_port);
-    // s_recv = setUpSocketTcp(&addr_recv, ip_addr, recv_port);
+    setupReceive(ip_addr, recv_port, protocol);
+    setupSend(ip_addr, send_port, protocol);
   } else {
-    setupReceive(ip_addr, recv_port);
-    setupSend(send_port);
-    // s_recv = setUpSocketTcp(&addr_recv, ip_addr, recv_port);
-    // s_send = setUpSocketTcpServer(&addr_send, &addr_len_send, send_port);
+    setupSend(ip_addr, send_port, protocol);
+    setupReceive(ip_addr, recv_port, protocol);
   }
 
   // 送信スレッド作成
