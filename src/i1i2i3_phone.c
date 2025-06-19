@@ -10,23 +10,17 @@
 #include <unistd.h>
 
 #include "lib/encode.h"
+#include "lib/network.h"
 #include "lib/setup_socket.h"
 
 void* send_thread_func(void* arg);
 FILE* fp;
-int s_recv;
-int s_send;
 
 void finish(const char* cmd) {
   if (cmd != NULL) {
     perror(cmd);
   }
-  if (s_recv >= 0) {
-    close(s_recv);
-  }
-  if (s_send >= 0) {
-    close(s_send);
-  }
+  cleanUp();
   pclose(fp);
 
   if (cmd != NULL) {
@@ -57,15 +51,19 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  struct sockaddr_in addr_recv;
-  struct sockaddr_in addr_send;
-  socklen_t addr_len_send = sizeof(struct sockaddr_in);
+  // struct sockaddr_in addr_recv;
+  // struct sockaddr_in addr_send;
+  // socklen_t addr_len_send = sizeof(struct sockaddr_in);
   if (strcmp(mode, "server") == 0) {
-    s_send = setUpSocketTcpServer(&addr_send, &addr_len_send, send_port);
-    s_recv = setUpSocketTcp(&addr_recv, ip_addr, recv_port);
+    setupSend(send_port);
+    setupReceive(ip_addr, recv_port);
+    // s_send = setUpSocketTcpServer(&addr_send, &addr_len_send, send_port);
+    // s_recv = setUpSocketTcp(&addr_recv, ip_addr, recv_port);
   } else {
-    s_recv = setUpSocketTcp(&addr_recv, ip_addr, recv_port);
-    s_send = setUpSocketTcpServer(&addr_send, &addr_len_send, send_port);
+    setupReceive(ip_addr, recv_port);
+    setupSend(send_port);
+    // s_recv = setUpSocketTcp(&addr_recv, ip_addr, recv_port);
+    // s_send = setUpSocketTcpServer(&addr_send, &addr_len_send, send_port);
   }
 
   // 送信スレッド作成
@@ -79,7 +77,8 @@ int main(int argc, char* argv[]) {
   int c;
   while (1) {
     // 受信
-    c = read(s_recv, buf, sizeof(buf));
+    c = receiveData(buf, sizeof(buf));
+    // c = read(s_recv, buf, sizeof(buf));
     if (c == 0) {
       break;
     }
@@ -121,7 +120,8 @@ void* send_thread_func(void* arg) {
       char encoded_buf[512];
       int encoded_len = encode(buf, c, encoded_buf);
 
-      if (write(s_send, encoded_buf, encoded_len) < 0) {
+      // if (write(s_send, encoded_buf, encoded_len) < 0) {
+      if (sendData(encoded_buf, encoded_len) < 0) {
         pclose(fp_send);
         finish("write");
       }
