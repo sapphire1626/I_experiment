@@ -75,17 +75,17 @@ int main(int argc, char* argv[]) {
     finish("pthread_create");
   }
 
-  char buf[256];
+  char recv_buf[2048]; // 2048本当に？
   int c;
   while (1) {
     // 受信
-    c = read(s_recv, buf, sizeof(buf));
+    c = read(s_recv, recv_buf, sizeof(recv_buf));
     if (c == 0) {
       break;
     }
     if (c > 0) {
       char decoded_buf[1024];
-      int decoded_len = decode(buf, c, decoded_buf);
+      int decoded_len = decode(recv_buf, c, decoded_buf);
       if (write(STDOUT_FILENO, decoded_buf, decoded_len) < 0) {
         finish("write");
       }
@@ -118,7 +118,7 @@ void* send_thread_func(void* arg) {
       finish("fread");
     }
     if (c > 0) {
-      char encoded_buf[512];
+      char encoded_buf[2048]; // 2048本当に？
       int encoded_len = encode(buf, c, encoded_buf);
 
       if (write(s_send, encoded_buf, encoded_len) < 0) {
