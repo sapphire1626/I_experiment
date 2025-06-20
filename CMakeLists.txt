@@ -9,8 +9,13 @@ file(GLOB LIB_SRC src/lib/*.c)
 
 add_compile_options(-Og)
 
+# find_package(ZSTD REQUIRED)
+
 add_library(lib ${LIB_SRC})
 target_include_directories(lib PUBLIC src/lib)
+# target_link_libraries(lib ZSTD::zstd)
+target_include_directories(lib PUBLIC /opt/homebrew/include)
+target_link_libraries(lib /opt/homebrew/lib/libzstd.dylib)
 
 foreach(SRC_FILE ${SRC_FILES})
     get_filename_component(BIN_NAME ${SRC_FILE} NAME_WE)

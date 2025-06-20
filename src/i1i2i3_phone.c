@@ -75,22 +75,29 @@ int main(int argc, char* argv[]) {
     finish("pthread_create");
   }
 
-  char recv_buf[2048]; // 2048本当に？
+  char recv_buf[BUFFER_SIZE];
   int c;
   while (1) {
-    // 受信
-    c = read(s_recv, recv_buf, sizeof(recv_buf));
-    if (c == 0) {
+    // まずエンコード後のデータ長（int）を受信
+    int encoded_len = 0;
+    int r = read(s_recv, &encoded_len, sizeof(int));
+    if (r == 0) {
       break;
     }
-    if (c > 0) {
-      char decoded_buf[1024];
-      int decoded_len = decode(recv_buf, c, decoded_buf);
-      if (write(STDOUT_FILENO, decoded_buf, decoded_len) < 0) {
-        finish("write");
-      }
-    } else if (c < 0) {
-      finish("read");
+    if (r < 0) {
+      finish("read encoded_len");
+    }
+    // 次にencoded_lenバイト分受信
+    int received = 0;
+    while (received < encoded_len) {
+      int n = read(s_recv, recv_buf + received, encoded_len - received);
+      if (n <= 0) finish("read encoded data");
+      received += n;
+    }
+    char decoded_buf[BUFFER_SIZE];
+    int decoded_len = decode(recv_buf, encoded_len, decoded_buf);
+    if (write(STDOUT_FILENO, decoded_buf, decoded_len) < 0) {
+      finish("write");
     }
   }
 
@@ -109,7 +116,7 @@ void* send_thread_func(void* arg) {
     perror("can not exec commad");
     finish("popen");
   }
-  char buf[256];
+  char buf[BUFFER_SIZE];
   int c;
   while (1) {
     c = fread(buf, sizeof(buf[0]), sizeof(buf) / sizeof(buf[0]), fp_send);
@@ -118,12 +125,17 @@ void* send_thread_func(void* arg) {
       finish("fread");
     }
     if (c > 0) {
-      char encoded_buf[2048]; // 2048本当に？
+      char encoded_buf[BUFFER_SIZE];
       int encoded_len = encode(buf, c, encoded_buf);
-
+      // まずencoded_lenを送信
+      if (write(s_send, &encoded_len, sizeof(int)) < 0) {
+        pclose(fp_send);
+        finish("write encoded_len");
+      }
+      // 次にencoded_buf本体を送信
       if (write(s_send, encoded_buf, encoded_len) < 0) {
         pclose(fp_send);
-        finish("write");
+        finish("write encoded_buf");
       }
     }
   }
