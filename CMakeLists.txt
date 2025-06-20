@@ -10,10 +10,14 @@ file(GLOB LIB_SRC src/lib/*.c)
 add_compile_options(-Og)
 
 # find_package(ZSTD REQUIRED)
+# find_package(FFTW3 REQUIRED)
 
 add_library(lib ${LIB_SRC})
 target_include_directories(lib PUBLIC src/lib)
 # target_link_libraries(lib ZSTD::zstd)
+# target_link_libraries(lib FFTW3::fftw3)
+target_include_directories(lib PUBLIC /opt/homebrew/include)
+target_link_libraries(lib /opt/homebrew/lib/libfftw3.dylib)
 target_include_directories(lib PUBLIC /opt/homebrew/include)
 target_link_libraries(lib /opt/homebrew/lib/libzstd.dylib)
 

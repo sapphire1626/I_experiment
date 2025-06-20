@@ -1,5 +1,6 @@
 #include "encode.h"
 #include <zstd.h>
+#include <fftw3.h>
 
 #include <string.h>
 #include <stdlib.h>
@@ -9,35 +10,6 @@
 
 #define NOISE_EST_FRAMES 10
 #define ENCODE_BUF_SIZE 1024
-
-// FFT/IFFT用関数
-void fft(complex double* x, complex double* y, int n) {
-    if (n == 1) {
-        y[0] = x[0];
-        return;
-    }
-    int m = n / 2;
-    complex double even[m], odd[m], Y_even[m], Y_odd[m];
-    for (int i = 0; i < m; i++) {
-        even[i] = x[2 * i];
-        odd[i] = x[2 * i + 1];
-    }
-    fft(even, Y_even, m);
-    fft(odd, Y_odd, m);
-    for (int k = 0; k < m; k++) {
-        complex double t = cexp(-2.0 * I * M_PI * k / n) * Y_odd[k];
-        y[k] = Y_even[k] + t;
-        y[k + m] = Y_even[k] - t;
-    }
-}
-
-void ifft(complex double* y, complex double* x, int n) {
-    for (int i = 0; i < n; i++) y[i] = conj(y[i]);
-    fft(y, x, n);
-    for (int i = 0; i < n; i++) {
-        x[i] = conj(x[i]) / n;
-    }
-}
 
 // スペクトル減算用ノイズ推定
 static float noise_mag[ENCODE_BUF_SIZE/2] = {0};
@@ -55,33 +27,63 @@ void spectral_subtraction(complex double* Y, int n) {
 
 void bandpass_and_spectral_sub(short* data, int len) {
     int n = len;
-    complex double x[n], y[n];
-    for (int i = 0; i < n; i++) x[i] = data[i];
-    fft(x, y, n);
+    fftw_complex *x = fftw_malloc(sizeof(fftw_complex) * n);
+    fftw_complex *y = fftw_malloc(sizeof(fftw_complex) * n);
+
+    for (int i = 0; i < n; i++) {
+        x[i][0] = data[i]; // 実部
+        x[i][1] = 0.0;     // 虚部
+    }
+
+    fftw_plan plan_fwd = fftw_plan_dft_1d(n, x, y, FFTW_FORWARD, FFTW_ESTIMATE);
+    fftw_plan plan_inv = fftw_plan_dft_1d(n, y, x, FFTW_BACKWARD, FFTW_ESTIMATE);
+
+    fftw_execute(plan_fwd);
+
     // バンドパス（300Hz～3400Hz）
     double df = 44100.0 / n;
     int k_low = (int)(300 / df + 0.5);
     int k_high = (int)(3400 / df + 0.5);
     for (int k = 0; k < n; k++) {
         int k_sym = (k <= n/2) ? k : n - k;
-        if (k_sym < k_low || k_sym > k_high) y[k] = 0;
+        if (k_sym < k_low || k_sym > k_high) {
+            y[k][0] = 0.0;
+            y[k][1] = 0.0;
+        }
     }
-    // ノイズ推定
+
+    // ノイズ推定・スペクトル減算
     if (noise_est_count < NOISE_EST_FRAMES) {
         for (int k = 0; k < n; k++) {
-            noise_mag[k] += cabs(y[k]) / NOISE_EST_FRAMES;
+            double mag = hypot(y[k][0], y[k][1]);
+            noise_mag[k] += mag / NOISE_EST_FRAMES;
         }
         noise_est_count++;
     } else {
-        spectral_subtraction(y, n);
+        for (int k = 0; k < n; k++) {
+            double mag = hypot(y[k][0], y[k][1]);
+            double phase = atan2(y[k][1], y[k][0]);
+            double sub = mag - noise_mag[k];
+            if (sub < 0) sub = 0;
+            y[k][0] = sub * cos(phase);
+            y[k][1] = sub * sin(phase);
+        }
     }
-    ifft(y, x, n);
+
+    fftw_execute(plan_inv);
+
+    // IFFT結果をPCMに戻す（FFTWはスケーリングしないのでnで割る）
     for (int i = 0; i < n; i++) {
-        double v = creal(x[i]);
+        double v = x[i][0] / n;
         if (v > 32767) v = 32767;
         if (v < -32768) v = -32768;
         data[i] = (short)v;
     }
+
+    fftw_destroy_plan(plan_fwd);
+    fftw_destroy_plan(plan_inv);
+    fftw_free(x);
+    fftw_free(y);
 }
 
 int encode(const char* input, int input_len, char* output) {
