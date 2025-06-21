@@ -8,31 +8,20 @@
 #include <complex.h>
 #include <stdio.h>
 
-#define NOISE_EST_FRAMES 10
-#define ENCODE_BUF_SIZE 1024
+#define NOISE_EST_FRAMES 10 // テキトーに決めた
 
-// スペクトル減算用ノイズ推定
-static float noise_mag[ENCODE_BUF_SIZE/2] = {0};
+
+static float noise_mag[BUFFER_SIZE/2] = {0};
 static int noise_est_count = 0;
 
-void spectral_subtraction(complex double* Y, int n) {
-    for (int k = 0; k < n; k++) {
-        float mag = cabs(Y[k]);
-        float phase = carg(Y[k]);
-        float sub = mag - noise_mag[k];
-        if (sub < 0) sub = 0;
-        Y[k] = sub * cexp(I * phase);
-    }
-}
-
-void bandpass_and_spectral_sub(short* data, int len) {
+void bandpass_noise_byebye(short* data, int len) {
     int n = len;
     fftw_complex *x = fftw_malloc(sizeof(fftw_complex) * n);
     fftw_complex *y = fftw_malloc(sizeof(fftw_complex) * n);
 
     for (int i = 0; i < n; i++) {
-        x[i][0] = data[i]; // 実部
-        x[i][1] = 0.0;     // 虚部
+        x[i][0] = data[i]; // re
+        x[i][1] = 0.0;     // im
     }
 
     fftw_plan plan_fwd = fftw_plan_dft_1d(n, x, y, FFTW_FORWARD, FFTW_ESTIMATE);
@@ -40,7 +29,7 @@ void bandpass_and_spectral_sub(short* data, int len) {
 
     fftw_execute(plan_fwd);
 
-    // バンドパス（300Hz～3400Hz）
+    // 300Hz～3400Hz
     double df = 44100.0 / n;
     int k_low = (int)(300 / df + 0.5);
     int k_high = (int)(3400 / df + 0.5);
@@ -52,7 +41,7 @@ void bandpass_and_spectral_sub(short* data, int len) {
         }
     }
 
-    // ノイズ推定・スペクトル減算
+    // ノイズ軽減
     if (noise_est_count < NOISE_EST_FRAMES) {
         for (int k = 0; k < n; k++) {
             double mag = hypot(y[k][0], y[k][1]);
@@ -72,7 +61,7 @@ void bandpass_and_spectral_sub(short* data, int len) {
 
     fftw_execute(plan_inv);
 
-    // IFFT結果をPCMに戻す（FFTWはスケーリングしないのでnで割る）
+    // スケーリング
     for (int i = 0; i < n; i++) {
         double v = x[i][0] / n;
         if (v > 32767) v = 32767;
@@ -87,10 +76,10 @@ void bandpass_and_spectral_sub(short* data, int len) {
 }
 
 int encode(const char* input, int input_len, char* output) {
-    // 音声前処理: FFT+バンドパス+スペクトル減算
-    bandpass_and_spectral_sub((short*)input, input_len / 2);
+    // バンドパス+ノイズ軽減+圧縮
+    bandpass_noise_byebye((short*)input, input_len / 2);
     size_t max_compressed = ZSTD_compressBound(input_len);
-    size_t compressed_size = ZSTD_compress(output, max_compressed, input, input_len, 1); // 圧縮レベル1
+    size_t compressed_size = ZSTD_compress(output, max_compressed, input, input_len, 1);
     if (ZSTD_isError(compressed_size)) {
         fprintf(stderr, "ZSTD_compress error: %s\n", ZSTD_getErrorName(compressed_size));
         return 0;
@@ -99,7 +88,7 @@ int encode(const char* input, int input_len, char* output) {
 }
 
 int decode(const char* input, int input_len, char* output) {
-    // 出力バッファは元のPCMサイズ分確保されている前提
+    // 解凍
     size_t decompressed_size = ZSTD_decompress(output, 1024, input, input_len);
     if (ZSTD_isError(decompressed_size)) {
         fprintf(stderr, "ZSTD_decompress error: %s\n", ZSTD_getErrorName(decompressed_size));
