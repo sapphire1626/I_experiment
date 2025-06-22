@@ -17,6 +17,7 @@
 
 int s_recv = -1;
 int s_send = -1;
+int communication_sock = -1;
 struct sockaddr_in addr_recv;
 struct sockaddr_in addr_send;
 
@@ -49,6 +50,19 @@ void build_rtp_header(uint8_t* packet, uint16_t seq, uint32_t ts,
   packet[11] = ssrc & 0xFF;
 }
 
+void setup(const char* ip_addr, int port) {
+  // gateにアクセスして通信に使うポートを割り当ててもらう
+  struct sockaddr_in gate_addr;
+  const int gate_sock = setUpSocketTcp(&gate_addr, ip_addr, port);
+  uint16_t port_u16;
+  read(gate_sock, &port_u16, sizeof(port_u16));
+  close(gate_sock);
+
+  // UDPで通信ソケットをセットアップ
+  const int communication_port = ntohs(port_u16);
+  communication_sock = setUpSocketUdp(&addr_send, ip_addr, communication_port);
+}
+
 void setupReceive(const char* ip_addr, int port, const char* protocol) {
   socklen_t addr_len_recv = sizeof(struct sockaddr_in);
   if (strcmp(protocol, "tcp") == 0) {
@@ -62,7 +76,6 @@ void setupReceive(const char* ip_addr, int port, const char* protocol) {
 }
 
 void setupSend(const char* ip_addr, int port, const char* protocol) {
-  socklen_t addr_len_send = sizeof(struct sockaddr_in);
   if (strcmp(protocol, "tcp") == 0) {
     s_send = setUpSocketTcp(&addr_send, ip_addr, port);
   } else if (strcmp(protocol, "udp") == 0) {
@@ -76,12 +89,12 @@ void setupSend(const char* ip_addr, int port, const char* protocol) {
 int receiveData(void* buf, int len) {
   // return read(s_recv, buf, len);
   socklen_t addr_len = sizeof(addr_recv);
-  return recvfrom(s_recv, buf, len, 0, (struct sockaddr*)&addr_recv, &addr_len);
+  return recvfrom(communication_sock, buf, len, 0, (struct sockaddr*)&addr_recv, &addr_len);
 }
 
 int sendData(const void* buf, int len) {
   // return write(s_send, buf, len);
-  return sendto(s_send, buf, len, 0, (struct sockaddr*)&addr_send,
+  return sendto(communication_sock, buf, len, 0, (struct sockaddr*)&addr_send,
                 sizeof(addr_send));
 }
 
@@ -91,5 +104,8 @@ void cleanUp() {
   }
   if (s_send >= 0) {
     close(s_send);
+  }
+  if (communication_sock >= 0) {
+    close(communication_sock);
   }
 }

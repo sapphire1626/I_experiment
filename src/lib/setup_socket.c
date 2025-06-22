@@ -44,6 +44,7 @@ int setUpSocketUdp(struct sockaddr_in* addr, const char* ip_addr, int port) {
 
 void setUpSockaddr(struct sockaddr_in* addr, const char* ip_addr, int port) {
   addr->sin_family = AF_INET;  // IPv4
+  
   if (inet_aton(ip_addr, &addr->sin_addr) == 0) {
     perror("inet_aton");
     exit(1);

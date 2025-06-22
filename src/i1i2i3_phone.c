@@ -31,34 +31,25 @@ void finish(const char* cmd) {
 }
 
 ///@brief
-///@param argv[1] 通信先IPアドレス
-///@param argv[2] 通信先ポート番号
-///@param argv[3] 受信ポート番号
-///@param argv[4] server or client
+///@param argv[1] サーバIPアドレス
+///@param argv[2] サーバポート
 int main(int argc, char* argv[]) {
   const char* ip_addr = argv[1];
-  const int recv_port = atoi(argv[2]);
-  const int send_port = atoi(argv[3]);
-  const char* mode = argv[4];
-  if (argc != 5) {
-    printf("Usage: %s <ip_addr> <recv_port> <send_port> <server/client>\n",
+  const int port = atoi(argv[2]);
+  if (argc != 3) {
+    printf("Usage: %s <server address> <server port>\n",
            argv[0]);
     return 1;
   }
-
-  if (strcmp(mode, "server") != 0 && strcmp(mode, "client") != 0) {
-    printf("mode must be 'server' or 'client'\n");
-    return 1;
-  }
-
-  const char* protocol = "tcp";
-  if (strcmp(mode, "server") == 0) {
-    setupReceive(ip_addr, recv_port, protocol);
-    setupSend(ip_addr, send_port, protocol);
-  } else {
-    setupSend(ip_addr, send_port, protocol);
-    setupReceive(ip_addr, recv_port, protocol);
-  }
+  // const char* protocol = "tcp";
+  // if (strcmp(mode, "server") == 0) {
+    // setupReceive(ip_addr, recv_port, protocol);
+    // setupSend(ip_addr, send_port, protocol);
+  // } else {
+    // setupSend(ip_addr, send_port, protocol);
+    // setupReceive(ip_addr, recv_port, protocol);
+  // }
+  setup(ip_addr, port);
 
   // 送信スレッド作成
   pthread_t send_thread;
@@ -96,18 +87,19 @@ int main(int argc, char* argv[]) {
 
 // 送信スレッド用関数
 void* send_thread_func(void* arg) {
-  char* cmdline = "rec -t raw -b 16 -c 1 -e s -r 44100 -";
-  FILE* fp_send = popen(cmdline, "r");
-  if (fp_send == NULL) {
-    perror("can not exec commad");
-    finish("popen");
-  }
+  // char* cmdline = "rec -t raw -b 16 -c 1 -e s -r 44100 -";
+  // FILE* fp_send = popen(cmdline, "r");
+  // if (fp_send == NULL) {
+  //   perror("can not exec command");
+  //   finish("popen");
+  // }
   char buf[256];
   int c;
   while (1) {
-    c = fread(buf, sizeof(buf[0]), sizeof(buf) / sizeof(buf[0]), fp_send);
+    // c = fread(buf, sizeof(buf[0]), sizeof(buf) / sizeof(buf[0]), fp_send);
+    c = read(STDIN_FILENO, buf, sizeof(buf));
     if (c < 0) {
-      pclose(fp_send);
+      // pclose(fp_send);
       finish("fread");
     }
     if (c > 0) {
@@ -116,11 +108,11 @@ void* send_thread_func(void* arg) {
 
       // if (write(s_send, encoded_buf, encoded_len) < 0) {
       if (sendData(encoded_buf, encoded_len) < 0) {
-        pclose(fp_send);
+        // pclose(fp_send);
         finish("write");
       }
     }
   }
-  pclose(fp_send);
+  // pclose(fp_send);
   return NULL;
 }
