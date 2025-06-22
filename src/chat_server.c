@@ -1,6 +1,6 @@
 #include <arpa/inet.h>
-#include <errno.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,13 +10,20 @@
 #include <unistd.h>
 
 #define GATE_PORT 16260
-#define MAX_PORT 17000
+#define MAX_PORT 16270
 #define BUF_SIZE 1024
 
+enum PortStatus {
+  PORT_FREE = 0,          // 当該ポートは未使用
+  PORT_WAIT_CONNECT = 1,  // 当該ポートで最初のアクセスが来るのを待機している
+  PORT_CONNECTED = 2,     // 当該ポートの接続先アドレスが判明している
+};
+
 typedef struct {
-  int used;
+  enum PortStatus status;
   int socket;
-  struct sockaddr addr;
+  struct sockaddr_in addr;
+  socklen_t addr_len;
 } client_info_t;
 
 typedef struct {
@@ -25,32 +32,27 @@ typedef struct {
 
 void init_client_table(client_table_t *table) {
   for (int i = 0; i < MAX_PORT - GATE_PORT; ++i) {
-    table->clients[i].used = 0;
+    table->clients[i].status = PORT_FREE;
     table->clients[i].socket = -1;
     memset(&table->clients[i].addr, 0, sizeof(table->clients[i].addr));
+    table->clients[i].addr_len = sizeof(table->clients[i].addr);
   }
 }
 
 int find_free_client(client_table_t *table) {
   for (int i = 1; i < MAX_PORT - GATE_PORT; ++i) {
-    if (!table->clients[i].used) return GATE_PORT + i;
+    if (table->clients[i].status == PORT_FREE) return GATE_PORT + i;
   }
   return -1;
 }
 
-void set_client_used(client_table_t *table, int port, int used) {
-  if (port > GATE_PORT && port < MAX_PORT) {
-    table->clients[port - GATE_PORT].used = used;
-  }
-}
-
 void udp_echo_server(int port, client_table_t *client_table) {
   const int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+  const int table_index = port - GATE_PORT;
   if (sockfd < 0) {
     perror("socket");
     exit(1);
   }
-  client_table->clients[port - GATE_PORT].socket = sockfd;
 
   // 待ち受けソケットを設定してsockfdにbind
   struct sockaddr_in serv_addr;
@@ -64,18 +66,45 @@ void udp_echo_server(int port, client_table_t *client_table) {
     exit(1);
   }
 
+  client_table->clients[port - GATE_PORT].socket = sockfd;
+  printf("port %d bound to socket %d\n", port,
+         client_table->clients[table_index].socket);
+
   char buf[BUF_SIZE];
-  socklen_t clilen = sizeof(client_table->clients[port - GATE_PORT].addr);
   while (1) {
     // 受信
     ssize_t n =
         recvfrom(sockfd, buf, BUF_SIZE, 0,
-                 &client_table->clients[port - GATE_PORT].addr, &clilen);
+                 (struct sockaddr *)&client_table->clients[table_index].addr,
+                 &client_table->clients[table_index].addr_len);
     if (n < 0) break;
 
-    // 送信
-    sendto(sockfd, buf, n, 0, &client_table->clients[port - GATE_PORT].addr,
-           clilen);
+    client_table->clients[table_index].status = PORT_CONNECTED;
+
+    // // 送信
+    const int num_clients = MAX_PORT - GATE_PORT;
+    for (int i = 1; i < num_clients; i++) {
+      if (client_table->clients[i].status != PORT_CONNECTED) {
+        // printf("not used client %d\n", i + GATE_PORT);
+        continue;
+      }
+      if (i == table_index) {
+        // printf("skipping self client %d\n", i + GATE_PORT);
+        continue;  // 自分自身には送信しない
+      }
+      if (client_table->clients[i].socket < 0) {
+        printf("invalid socket for client %d\n", i + GATE_PORT);
+        continue;  // ソケットが無効な場合はスキップ
+      }
+
+      printf("sending to client port = %d, socket = %d\n", i + GATE_PORT,
+             client_table->clients[i].socket);
+      if (sendto(client_table->clients[i].socket, buf, n, 0,
+                 (struct sockaddr *)&client_table->clients[i].addr,
+                 client_table->clients[i].addr_len) < 0) {
+        perror("sendto");
+      }
+    }
   }
   close(sockfd);
   exit(0);
@@ -93,11 +122,24 @@ void on_finish() {
   exit(0);
 }
 
+typedef struct {
+  int port;
+  client_table_t *client_table;
+} udp_server_arg_t;
+
+void *udp_echo_server_thread(void *arg) {
+  udp_server_arg_t *server_arg = (udp_server_arg_t *)arg;
+  int port = server_arg->port;
+  client_table_t *client_table = server_arg->client_table;
+  free(server_arg);
+  udp_echo_server(port, client_table);
+  return NULL;
+}
+
 int main() {
   // シグナルハンドラで確実にソケットを閉じる
   signal(SIGINT, on_finish);
 
-  struct sockaddr_in gate_addr, cli_addr;
   client_table_t client_table;
   init_client_table(&client_table);
 
@@ -106,6 +148,7 @@ int main() {
     perror("socket");
     exit(1);
   }
+  struct sockaddr_in gate_addr;
   memset(&gate_addr, 0, sizeof(gate_addr));
   gate_addr.sin_family = AF_INET;
   gate_addr.sin_addr.s_addr = INADDR_ANY;
@@ -119,6 +162,8 @@ int main() {
   printf("Gate TCP server listening on port %d\n", GATE_PORT);
 
   while (1) {
+    // 受付
+    struct sockaddr_in cli_addr;
     socklen_t clilen = sizeof(cli_addr);
     if ((gate_newsock =
              accept(gate_sock, (struct sockaddr *)&cli_addr, &clilen)) < 0) {
@@ -133,20 +178,25 @@ int main() {
       close(gate_newsock);
       continue;
     }
-    set_client_used(&client_table, p, 1);
+    client_table.clients[p - GATE_PORT].status = PORT_WAIT_CONNECT;
 
     // ポート番号をクライアントに送信
     uint16_t port_u16 = htons(p);  // バイトオーダの調整
     write(gate_newsock, &port_u16, sizeof(port_u16));
     close(gate_newsock);
 
-    // 子プロセスでUDP echoサーバ起動
-    pid_t pid = fork();
-    if (pid == 0) {
-      udp_echo_server(p, &client_table);
-      set_client_used(&client_table, p, 0);  // 終了時に解放
-      exit(0);
+    // スレッドでUDP echoサーバ起動
+    pthread_t tid;
+    udp_server_arg_t *arg = malloc(sizeof(udp_server_arg_t));
+    arg->port = p;
+    arg->client_table = &client_table;
+    if (pthread_create(&tid, NULL, udp_echo_server_thread, arg) != 0) {
+      perror("pthread_create");
+      client_table.clients[p - GATE_PORT].status = PORT_FREE;
+      free(arg);
+      continue;
     }
+    pthread_detach(tid);  // 終了時に自動回収
   }
   close(gate_sock);
   return 0;
