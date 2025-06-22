@@ -14,9 +14,9 @@
 #define BUF_SIZE 1024
 
 enum PortStatus {
-  PORT_FREE = 0,          // 当該ポートは未使用
+  PORT_FREE = 0,  // 当該ポートは未使用
   PORT_WAIT_CONNECT = 1,  // 当該ポートで最初のアクセスが来るのを待機している
-  PORT_CONNECTED = 2,     // 当該ポートの接続先アドレスが判明している
+  PORT_CONNECTED = 2,  // 当該ポートの接続先アドレスが判明している
 };
 
 typedef struct {
@@ -46,7 +46,7 @@ int find_free_client(client_table_t *table) {
   return -1;
 }
 
-void udp_echo_server(int port, client_table_t *client_table) {
+void udp_server(int port, client_table_t *client_table) {
   const int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
   const int table_index = port - GATE_PORT;
   if (sockfd < 0) {
@@ -73,7 +73,7 @@ void udp_echo_server(int port, client_table_t *client_table) {
   char buf[BUF_SIZE];
   while (1) {
     // 受信
-    ssize_t n =
+    const ssize_t n =
         recvfrom(sockfd, buf, BUF_SIZE, 0,
                  (struct sockaddr *)&client_table->clients[table_index].addr,
                  &client_table->clients[table_index].addr_len);
@@ -97,8 +97,8 @@ void udp_echo_server(int port, client_table_t *client_table) {
         continue;  // ソケットが無効な場合はスキップ
       }
 
-      printf("sending to client port = %d, socket = %d\n", i + GATE_PORT,
-             client_table->clients[i].socket);
+      // printf("sending to client port = %d, socket = %d\n", i + GATE_PORT,
+      //  client_table->clients[i].socket);
       if (sendto(client_table->clients[i].socket, buf, n, 0,
                  (struct sockaddr *)&client_table->clients[i].addr,
                  client_table->clients[i].addr_len) < 0) {
@@ -132,7 +132,7 @@ void *udp_echo_server_thread(void *arg) {
   int port = server_arg->port;
   client_table_t *client_table = server_arg->client_table;
   free(server_arg);
-  udp_echo_server(port, client_table);
+  udp_server(port, client_table);
   return NULL;
 }
 

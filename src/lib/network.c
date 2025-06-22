@@ -89,7 +89,8 @@ void setupSend(const char* ip_addr, int port, const char* protocol) {
 int receiveData(void* buf, int len) {
   // return read(s_recv, buf, len);
   socklen_t addr_len = sizeof(addr_recv);
-  return recvfrom(communication_sock, buf, len, 0, (struct sockaddr*)&addr_recv, &addr_len);
+  return recvfrom(communication_sock, buf, len, 0, (struct sockaddr*)&addr_recv,
+                  &addr_len);
 }
 
 int sendData(const void* buf, int len) {
