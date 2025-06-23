@@ -15,8 +15,6 @@
 #define SAMPLE_RATE 8000
 #define PACKET_SIZE 160
 
-int s_recv = -1;
-int s_send = -1;
 int communication_sock = -1;
 struct sockaddr_in addr_recv;
 struct sockaddr_in addr_send;
@@ -63,29 +61,6 @@ void setup(const char* ip_addr, int port) {
   communication_sock = setUpSocketUdp(&addr_send, ip_addr, communication_port);
 }
 
-void setupReceive(const char* ip_addr, int port, const char* protocol) {
-  socklen_t addr_len_recv = sizeof(struct sockaddr_in);
-  if (strcmp(protocol, "tcp") == 0) {
-    s_recv = setUpSocketTcpServer(&addr_recv, &addr_len_recv, port);
-  } else if (strcmp(protocol, "udp") == 0) {
-    s_recv = setUpSocketUdpServer(&addr_recv, &addr_len_recv, port);
-  } else {
-    fprintf(stderr, "Unsupported protocol: %s\n", protocol);
-    exit(EXIT_FAILURE);
-  }
-}
-
-void setupSend(const char* ip_addr, int port, const char* protocol) {
-  if (strcmp(protocol, "tcp") == 0) {
-    s_send = setUpSocketTcp(&addr_send, ip_addr, port);
-  } else if (strcmp(protocol, "udp") == 0) {
-    s_send = setUpSocketUdp(&addr_send, ip_addr, port);
-  } else {
-    fprintf(stderr, "Unsupported protocol: %s\n", protocol);
-    exit(EXIT_FAILURE);
-  }
-}
-
 int receiveData(void* buf, int len) {
   // return read(s_recv, buf, len);
   socklen_t addr_len = sizeof(addr_recv);
@@ -100,12 +75,6 @@ int sendData(const void* buf, int len) {
 }
 
 void cleanUp() {
-  if (s_recv >= 0) {
-    close(s_recv);
-  }
-  if (s_send >= 0) {
-    close(s_send);
-  }
   if (communication_sock >= 0) {
     close(communication_sock);
   }
