@@ -69,8 +69,8 @@ int main(int argc, char* argv[]) {
     //   received += n;
     // }
     char decoded_buf[BUFFER_SIZE];
-    // int decoded_len = decode(recv_buf, c, decoded_buf);
-    if (write(STDOUT_FILENO, recv_buf, c) < 0) {
+    int decoded_len = decode(recv_buf, c, decoded_buf);
+    if (write(STDOUT_FILENO, decoded_buf, decoded_len) < 0) {
       finish("write");
     }
   }
@@ -100,9 +100,9 @@ void* send_thread_func(void* arg) {
     }
     if (c > 0) {
       char encoded_buf[BUFFER_SIZE];
-      // int encoded_len = encode(buf, c, encoded_buf);
+      int encoded_len = encode(buf, c, encoded_buf);
 
-      if (sendData(buf, c) < 0) {
+      if (sendData(encoded_buf, encoded_len) < 0) {
         pclose(fp_send);
         finish("write encoded_buf");
       }
