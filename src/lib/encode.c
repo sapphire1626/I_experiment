@@ -77,24 +77,28 @@ void bandpass_noise_byebye(short* data, int len) {
 int encode(const char* input, int input_len, char* output) {
   // バンドパス+ノイズ軽減+圧縮
   bandpass_noise_byebye((short*)input, input_len / 2);
-  size_t max_compressed = ZSTD_compressBound(input_len);
-  size_t compressed_size =
-      ZSTD_compress(output, max_compressed, input, input_len, 1);
-  if (ZSTD_isError(compressed_size)) {
-    fprintf(stderr, "ZSTD_compress error: %s\n",
-            ZSTD_getErrorName(compressed_size));
-    return 0;
-  }
-  return (int)compressed_size;
+  memcpy(output, input, input_len);
+  return input_len;
+  // size_t max_compressed = ZSTD_compressBound(input_len);
+  // size_t compressed_size =
+  //     ZSTD_compress(output, max_compressed, input, input_len, 1);
+  // if (ZSTD_isError(compressed_size)) {
+  //   fprintf(stderr, "ZSTD_compress error: %s\n",
+  //           ZSTD_getErrorName(compressed_size));
+  //   return 0;
+  // }
+  // return (int)compressed_size;
 }
 
 int decode(const char* input, int input_len, char* output) {
   // 解凍
-  size_t decompressed_size = ZSTD_decompress(output, 1024, input, input_len);
-  if (ZSTD_isError(decompressed_size)) {
-    fprintf(stderr, "ZSTD_decompress error: %s\n",
-            ZSTD_getErrorName(decompressed_size));
-    return 0;
-  }
-  return (int)decompressed_size;
+  // size_t decompressed_size = ZSTD_decompress(output, 1024, input, input_len);
+  // if (ZSTD_isError(decompressed_size)) {
+  //   fprintf(stderr, "ZSTD_decompress error: %s\n",
+  //           ZSTD_getErrorName(decompressed_size));
+  //   return 0;
+  // }
+  // return (int)decompressed_size;
+  memcpy(output, input, input_len);
+  return input_len;
 }
