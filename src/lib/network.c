@@ -18,7 +18,7 @@
 #define DATA_SIZE 1024
 #define GATE_PORT 16260
 #define MAX_PORT 16280
-#define RING_SIZE 10
+#define RING_SIZE 1000
 
 void storeDataBuffer(int port, const uint8_t* data, int len);
 int getDataBuffer(int port, uint8_t* data);
@@ -27,6 +27,7 @@ struct sockaddr_in addr_recv;
 struct sockaddr_in addr_send;
 pthread_t data_receive_thread;
 int communication_port = -1;
+static uint16_t data_seq_latest[MAX_PORT - GATE_PORT] = {0};
 
 typedef struct {
   uint8_t vpxcc;       // version(2), padding(0), extension(0), CSRC count(0)
@@ -69,6 +70,13 @@ void* dataReceiveThreadFn(void* arg) {
     }
     const RTPHeader header = makeRTPHeaderFromPacket(packet);
     const int port = header.ssrc;
+    if (data_seq_latest[port - GATE_PORT] >= header.seq) {
+      fprintf(stderr,
+              "Received duplicate or out-of-order packet on port %d: "
+              "expected seq %d, got %d\n",
+              port, data_seq_latest[port - GATE_PORT], header.seq);
+      continue;  // 重複または順序がずれたパケットは無視
+    }
     // データをストア
     storeDataBuffer(port, packet + RTP_HEADER_SIZE, payload_len);
   }
@@ -129,7 +137,8 @@ int receiveData(void* buf, int len) {
 
 int sendData(const void* buf, int len) {
   uint8_t packet[RTP_HEADER_SIZE + len];
-  makeRTPHeader((RTPHeader*)packet, rtp_seq++, rtp_timestamp, communication_port);
+  makeRTPHeader((RTPHeader*)packet, rtp_seq++, rtp_timestamp,
+                communication_port);
   memcpy(packet + RTP_HEADER_SIZE, buf, len);
   rtp_timestamp += len;  // サンプル数分進める（用途に応じて調整）
   return sendto(communication_sock, packet, RTP_HEADER_SIZE + len, 0,
@@ -166,6 +175,10 @@ void storeDataBuffer(int port, const uint8_t* data, int len) {
     // 上書き（古いデータを捨てる）
     tail[idx] = (tail[idx] + 1) % RING_SIZE;
     count[idx]--;
+    // fprintf(
+    //     stderr,
+    //     "Warning: Data buffer for port %d is full, overwriting oldest data\n",
+    //     port);
   }
   memcpy(data_buffer[idx][head[idx]], data, len);
   data_lengths[idx][head[idx]] = len;
