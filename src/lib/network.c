@@ -25,27 +25,14 @@ typedef struct {
   uint16_t seq;  // sequence number
   uint32_t timestamp; // timestamp
   uint32_t ssrc; // synchronization source identifier
-} RTPHeader;
+} __attribute__((packed)) RTPHeader;
 
-void build_rtp_header(uint8_t* packet, uint16_t seq, uint32_t ts,
-                      uint32_t ssrc) {
-  packet[0] = 0x80;  // Version 2, no padding, no extension, CC=0
-  packet[1] = 0x00 | 0x00 | 0x00 | 0x00 | 0x00 | 0x00 | 0x00 |
-              0x00;                        // M=0, PT=0 (PCMU)
-  packet[1] |= 0x00 | 0x00 | 0x00 | 0x08;  // PT=8 (PCMU)
-
-  packet[2] = seq >> 8;
-  packet[3] = seq & 0xFF;
-
-  packet[4] = ts >> 24;
-  packet[5] = ts >> 16;
-  packet[6] = ts >> 8;
-  packet[7] = ts & 0xFF;
-
-  packet[8] = ssrc >> 24;
-  packet[9] = ssrc >> 16;
-  packet[10] = ssrc >> 8;
-  packet[11] = ssrc & 0xFF;
+void makeRTPHeader(RTPHeader* header, uint16_t seq, uint32_t ts, uint32_t ssrc) {
+  header->vpxcc = 0x80; // Version 2, no padding, no extension, CC=0
+  header->mpt = 0x00;   // M=0, PT=0 (PCMU)
+  header->seq = htons(seq);
+  header->timestamp = htonl(ts);
+  header->ssrc = htonl(ssrc);
 }
 
 void setup(const char* ip_addr, int port) {
@@ -80,7 +67,7 @@ int receiveData(void* buf, int len) {
 
 int sendData(const void* buf, int len) {
   uint8_t packet[RTP_HEADER_SIZE + len];
-  build_rtp_header(packet, rtp_seq++, rtp_timestamp, rtp_ssrc);
+  makeRTPHeader((RTPHeader*)packet, rtp_seq++, rtp_timestamp, rtp_ssrc);
   memcpy(packet + RTP_HEADER_SIZE, buf, len);
   rtp_timestamp += len;  // サンプル数分進める（用途に応じて調整）
   return sendto(communication_sock, packet, RTP_HEADER_SIZE + len, 0, (struct sockaddr*)&addr_send,
