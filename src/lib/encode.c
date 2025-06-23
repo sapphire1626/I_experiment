@@ -8,9 +8,11 @@
 #include <string.h>
 #include <zstd.h>
 
+#include "params.h"
+
 #define NOISE_EST_FRAMES 10  // テキトーに決めた
 
-static float noise_mag[BUFFER_SIZE / 2] = {0};
+static float noise_mag[DATA_SIZE / 2] = {0};
 static int noise_est_count = 0;
 
 void bandpass_noise_byebye(short* data, int len) {

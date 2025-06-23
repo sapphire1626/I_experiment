@@ -9,9 +9,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define GATE_PORT 16260
-#define MAX_PORT 16280  // これを含まない
-#define BUF_SIZE 1024
+#include "lib/params.h"
 
 enum PortStatus {
   PORT_FREE = 0,  // 当該ポートは未使用
@@ -76,11 +74,11 @@ void udp_server(int port, client_table_t *client_table) {
   printf("port %d bound to socket %d\n", port,
          client_table->clients[table_index].socket);
 
-  char buf[BUF_SIZE];
+  char buf[DATA_SIZE];
   while (1) {
     // 受信
     const ssize_t n =
-        recvfrom(sockfd, buf, BUF_SIZE, 0,
+        recvfrom(sockfd, buf, DATA_SIZE, 0,
                  (struct sockaddr *)&client_table->clients[table_index].addr,
                  &client_table->clients[table_index].addr_len);
     if (n < 0) {

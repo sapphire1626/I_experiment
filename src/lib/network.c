@@ -9,15 +9,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "params.h"
 #include "setup_socket.h"
 
 #define RTP_HEADER_SIZE 12
-#define RTP_PORT 5004
-#define SAMPLE_RATE 8000
-#define PACKET_SIZE 160
-#define DATA_SIZE 1024
-#define GATE_PORT 16260
-#define MAX_PORT 16280
 #define RING_SIZE 1000
 
 void storeDataBuffer(int port, const uint8_t* data, int len);
@@ -86,10 +81,10 @@ void* dataReceiveThreadFn(void* arg) {
   }
 }
 
-void setup(const char* ip_addr, int port) {
+void setup(const char* ip_addr) {
   // gateにアクセスして通信に使うポートを割り当ててもらう
   struct sockaddr_in gate_addr;
-  const int gate_sock = setUpSocketTcp(&gate_addr, ip_addr, port);
+  const int gate_sock = setUpSocketTcp(&gate_addr, ip_addr, GATE_PORT);
   uint16_t port_u16;
   read(gate_sock, &port_u16, sizeof(port_u16));
   close(gate_sock);
@@ -110,17 +105,17 @@ void setup(const char* ip_addr, int port) {
 static uint16_t rtp_seq = 0;
 static uint32_t rtp_timestamp = 0;
 
-int receiveData(void* buf, int len) {
-  while (1) {
-    for (int port = GATE_PORT; port < MAX_PORT; port++) {
-      int len = getDataBuffer(port, (uint8_t*)buf);
-      if (len > 0) {
-        // fprintf(stderr, "Received data from port %d, length %d\n", port,
-        // len);
-        return len;  // データがあれば返す
-      }
+int receiveData(void* buf, int lens[], int ports[]) {
+  int num_clients = 0;
+  for (int port = GATE_PORT; port < MAX_PORT; port++) {
+    int len = getDataBuffer(port, (uint8_t*)(buf + DATA_SIZE * num_clients));
+    if (len > 0) {
+      lens[num_clients] = len;
+      ports[num_clients] = port;
+      num_clients++;
     }
   }
+  return num_clients;
 }
 
 int sendData(const void* buf, int len) {

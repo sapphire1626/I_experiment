@@ -1,6 +1,5 @@
 #pragma once
 
-#define BUFFER_SIZE 1024
 #define SAMPLE_RATE 44100
 #define MIN_FREQ 300
 #define MAX_FREQ 3400

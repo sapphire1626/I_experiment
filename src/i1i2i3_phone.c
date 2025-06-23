@@ -13,6 +13,7 @@
 
 #include "lib/encode.h"
 #include "lib/network.h"
+#include "lib/params.h"
 #include "lib/setup_socket.h"
 
 void* send_thread_func(void* arg);
@@ -34,15 +35,13 @@ void finish(const char* cmd) {
 
 ///@brief
 ///@param argv[1] サーバIPアドレス
-///@param argv[2] サーバポート
 int main(int argc, char* argv[]) {
   const char* ip_addr = argv[1];
-  const int port = atoi(argv[2]);
-  if (argc != 3) {
-    printf("Usage: %s <server address> <server port>\n", argv[0]);
+  if (argc != 2) {
+    printf("Usage: %s <server address>\n", argv[0]);
     return 1;
   }
-  setup(ip_addr, port);
+  setup(ip_addr);
 
   // 送信スレッド作成
   pthread_t send_thread;
@@ -51,28 +50,20 @@ int main(int argc, char* argv[]) {
     finish("pthread_create");
   }
 
-  char recv_buf[BUFFER_SIZE];
-  int c;
+  char recv_buf[DATA_SIZE * (MAX_PORT - GATE_PORT)];
+  int length_list[MAX_PORT - GATE_PORT];
+  int port_list[MAX_PORT - GATE_PORT];
+  char decoded_buf[DATA_SIZE];
   while (1) {
     // 受信
-    c = receiveData(recv_buf, sizeof(recv_buf));
-    if (c == 0) {
-      break;
-    }
-    // if (r < 0) {
-    //   finish("read encoded_len");
-    // }
-    // 次にencoded_lenバイト分受信
-    // int received = 0;
-    // while (received < encoded_len) {
-    //   int n = read(s_recv, recv_buf + received, encoded_len - received);
-    //   if (n <= 0) finish("read encoded data");
-    //   received += n;
-    // }
-    char decoded_buf[BUFFER_SIZE];
-    int decoded_len = decode(recv_buf, c, decoded_buf);
-    if (write(STDOUT_FILENO, decoded_buf, decoded_len) < 0) {
-      finish("write");
+    int num_clients = receiveData(recv_buf, length_list, port_list);
+
+    for (int i = 0; i < num_clients; i++) {
+      int decoded_len =
+          decode(recv_buf + DATA_SIZE * i, length_list[i], decoded_buf);
+      if (write(STDOUT_FILENO, decoded_buf, decoded_len) < 0) {
+        finish("write");
+      }
     }
   }
 
@@ -91,7 +82,7 @@ void* send_thread_func(void* arg) {
     perror("can not exec command");
     finish("popen");
   }
-  char buf[BUFFER_SIZE];
+  char buf[DATA_SIZE];
   int c;
   // // ここから
   // static int seeded = 0;
@@ -114,7 +105,7 @@ void* send_thread_func(void* arg) {
       //   32767; if (v < -32768) v = -32768; pcm[i] = (short)v;
       // }
       // // --- ノイズ付加ここまで ---
-      char encoded_buf[BUFFER_SIZE];
+      char encoded_buf[DATA_SIZE];
       int encoded_len = encode(buf, c, encoded_buf);
 
       if (sendData(encoded_buf, encoded_len) < 0) {
