@@ -20,11 +20,11 @@ struct sockaddr_in addr_recv;
 struct sockaddr_in addr_send;
 
 typedef struct {
-  uint8_t vpxcc;
-  uint8_t mpt;
-  uint16_t seq;
-  uint32_t timestamp;
-  uint32_t ssrc;
+  uint8_t vpxcc; // version(2), padding(0), extension(0), CSRC count(0)
+  uint8_t mpt;   // marker(0), payload type(0)
+  uint16_t seq;  // sequence number
+  uint32_t timestamp; // timestamp
+  uint32_t ssrc; // synchronization source identifier
 } RTPHeader;
 
 void build_rtp_header(uint8_t* packet, uint16_t seq, uint32_t ts,
@@ -61,16 +61,29 @@ void setup(const char* ip_addr, int port) {
   communication_sock = setUpSocketUdp(&addr_send, ip_addr, communication_port);
 }
 
+// RTP用グローバル変数
+static uint16_t rtp_seq = 0;
+static uint32_t rtp_timestamp = 0;
+static uint32_t rtp_ssrc = 0x12345678;  // 任意の値でOK
+
 int receiveData(void* buf, int len) {
-  // return read(s_recv, buf, len);
+  uint8_t packet[RTP_HEADER_SIZE + len];
   socklen_t addr_len = sizeof(addr_recv);
-  return recvfrom(communication_sock, buf, len, 0, (struct sockaddr*)&addr_recv,
-                  &addr_len);
+  int recv_len = recvfrom(communication_sock, packet, RTP_HEADER_SIZE + len, 0, (struct sockaddr*)&addr_recv, &addr_len);
+  if (recv_len <= RTP_HEADER_SIZE) {
+    return 0; // データなし or 不正
+  }
+  int payload_len = recv_len - RTP_HEADER_SIZE;
+  memcpy(buf, packet + RTP_HEADER_SIZE, payload_len);
+  return payload_len;
 }
 
 int sendData(const void* buf, int len) {
-  // return write(s_send, buf, len);
-  return sendto(communication_sock, buf, len, 0, (struct sockaddr*)&addr_send,
+  uint8_t packet[RTP_HEADER_SIZE + len];
+  build_rtp_header(packet, rtp_seq++, rtp_timestamp, rtp_ssrc);
+  memcpy(packet + RTP_HEADER_SIZE, buf, len);
+  rtp_timestamp += len;  // サンプル数分進める（用途に応じて調整）
+  return sendto(communication_sock, packet, RTP_HEADER_SIZE + len, 0, (struct sockaddr*)&addr_send,
                 sizeof(addr_send));
 }
 
