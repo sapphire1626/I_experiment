@@ -63,6 +63,10 @@ void* dataReceiveThreadFn(void* arg) {
     int recv_len =
         recvfrom(communication_sock, packet, RTP_HEADER_SIZE + DATA_SIZE, 0,
                  (struct sockaddr*)&addr_recv, &addr_len);
+    if (recv_len < 0) {
+      perror("recvfrom failed");
+      continue;  // エラーが発生した場合は再試行
+    }
     const int payload_len = recv_len - RTP_HEADER_SIZE;
     if (payload_len <= 0) {
       fprintf(stderr, "No data received or invalid packet size\n");
@@ -107,22 +111,6 @@ static uint16_t rtp_seq = 0;
 static uint32_t rtp_timestamp = 0;
 
 int receiveData(void* buf, int len) {
-  // uint8_t packet[RTP_HEADER_SIZE + len];
-  // socklen_t addr_len = sizeof(addr_recv);
-  // int recv_len = recvfrom(communication_sock, packet, RTP_HEADER_SIZE + len,
-  // 0,
-  //                         (struct sockaddr*)&addr_recv, &addr_len);
-  // if (recv_len <= RTP_HEADER_SIZE) {
-  //   return 0;  // データなし or 不正
-  // }
-  // int payload_len = recv_len - RTP_HEADER_SIZE;
-  // memcpy(buf, packet + RTP_HEADER_SIZE, payload_len);
-  // RTPHeader header = makeRTPHeaderFromPacket(packet);
-  // if (header.ssrc != rtp_ssrc) {
-  //   fprintf(stderr, "Received packet with unexpected SSRC: %u\n",
-  //   header.ssrc);
-  // }
-  // return payload_len;
   while (1) {
     for (int port = GATE_PORT; port < MAX_PORT; port++) {
       int len = getDataBuffer(port, (uint8_t*)buf);
@@ -177,8 +165,8 @@ void storeDataBuffer(int port, const uint8_t* data, int len) {
     count[idx]--;
     // fprintf(
     //     stderr,
-    //     "Warning: Data buffer for port %d is full, overwriting oldest data\n",
-    //     port);
+    //     "Warning: Data buffer for port %d is full, overwriting oldest
+    //     data\n", port);
   }
   memcpy(data_buffer[idx][head[idx]], data, len);
   data_lengths[idx][head[idx]] = len;

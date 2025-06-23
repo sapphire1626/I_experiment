@@ -109,11 +109,9 @@ void* send_thread_func(void* arg) {
       // int nsamp = c / 2; // short型PCMサンプル数
       // int NOISE_LEVEL = 1000; // ノイズ強度（調整可）
       // for (int i = 0; i < nsamp; i++) {
-      //   int noise = (rand() % (2 * NOISE_LEVEL)) - NOISE_LEVEL; // -NOISE_LEVEL～+NOISE_LEVEL
-      //   int v = pcm[i] + noise;
-      //   if (v > 32767) v = 32767;
-      //   if (v < -32768) v = -32768;
-      //   pcm[i] = (short)v;
+      //   int noise = (rand() % (2 * NOISE_LEVEL)) - NOISE_LEVEL; //
+      //   -NOISE_LEVEL～+NOISE_LEVEL int v = pcm[i] + noise; if (v > 32767) v =
+      //   32767; if (v < -32768) v = -32768; pcm[i] = (short)v;
       // }
       // // --- ノイズ付加ここまで ---
       char encoded_buf[BUFFER_SIZE];
