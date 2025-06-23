@@ -35,6 +35,15 @@ void makeRTPHeader(RTPHeader* header, uint16_t seq, uint32_t ts, uint32_t ssrc) 
   header->ssrc = htonl(ssrc);
 }
 
+RTPHeader makeRTPHeaderFromPacket(uint8_t* packet) {
+  RTPHeader header;
+  memcpy(&header, packet, sizeof(RTPHeader));
+  header.seq = ntohs(header.seq);
+  header.timestamp = ntohl(header.timestamp);
+  header.ssrc = ntohl(header.ssrc);
+  return header;
+}
+
 void setup(const char* ip_addr, int port) {
   // gateにアクセスして通信に使うポートを割り当ててもらう
   struct sockaddr_in gate_addr;
@@ -51,7 +60,7 @@ void setup(const char* ip_addr, int port) {
 // RTP用グローバル変数
 static uint16_t rtp_seq = 0;
 static uint32_t rtp_timestamp = 0;
-static uint32_t rtp_ssrc = 0x12345678;  // 任意の値でOK
+static const uint32_t rtp_ssrc = 0x12345678;  // 任意の値でOK
 
 int receiveData(void* buf, int len) {
   uint8_t packet[RTP_HEADER_SIZE + len];
@@ -62,6 +71,10 @@ int receiveData(void* buf, int len) {
   }
   int payload_len = recv_len - RTP_HEADER_SIZE;
   memcpy(buf, packet + RTP_HEADER_SIZE, payload_len);
+  RTPHeader header = makeRTPHeaderFromPacket(packet);
+  if(header.ssrc != rtp_ssrc) {
+    fprintf(stderr, "Received packet with unexpected SSRC: %u\n", header.ssrc);
+  }
   return payload_len;
 }
 
