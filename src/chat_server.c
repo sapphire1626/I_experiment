@@ -10,7 +10,7 @@
 #include <unistd.h>
 
 #define GATE_PORT 16260
-#define MAX_PORT 16280
+#define MAX_PORT 16280 // これを含まない
 #define BUF_SIZE 1024
 
 enum PortStatus {
