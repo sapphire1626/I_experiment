@@ -107,7 +107,7 @@ void udp_server(int port, client_table_t *client_table) {
     }
   }
   close(sockfd);
-  exit(0);
+  client_table->clients[table_index].status = PORT_FREE;
 }
 
 int gate_sock = -1, gate_newsock = -1;
@@ -192,7 +192,6 @@ int main() {
     arg->client_table = &client_table;
     if (pthread_create(&tid, NULL, udp_echo_server_thread, arg) != 0) {
       perror("pthread_create");
-      client_table.clients[p - GATE_PORT].status = PORT_FREE;
       free(arg);
       continue;
     }
