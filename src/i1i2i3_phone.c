@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <math.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -49,22 +50,28 @@ int main(int argc, char* argv[]) {
     finish("pthread_create");
   }
 
-  char buf[256];
+  char recv_buf[BUFFER_SIZE];
   int c;
   while (1) {
     // 受信
-    c = receiveData(buf, sizeof(buf));
+    c = receiveData(recv_buf, sizeof(recv_buf));
     if (c == 0) {
       break;
     }
-    if (c > 0) {
-      char decoded_buf[1024];
-      int decoded_len = decode(buf, c, decoded_buf);
-      if (write(STDOUT_FILENO, decoded_buf, decoded_len) < 0) {
-        finish("write");
-      }
-    } else if (c < 0) {
-      finish("read");
+    // if (r < 0) {
+    //   finish("read encoded_len");
+    // }
+    // 次にencoded_lenバイト分受信
+    // int received = 0;
+    // while (received < encoded_len) {
+    //   int n = read(s_recv, recv_buf + received, encoded_len - received);
+    //   if (n <= 0) finish("read encoded data");
+    //   received += n;
+    // }
+    char decoded_buf[BUFFER_SIZE];
+    int decoded_len = decode(recv_buf, c, decoded_buf);
+    if (write(STDOUT_FILENO, decoded_buf, decoded_len) < 0) {
+      finish("write");
     }
   }
 
@@ -83,7 +90,7 @@ void* send_thread_func(void* arg) {
     perror("can not exec command");
     finish("popen");
   }
-  char buf[256];
+  char buf[BUFFER_SIZE];
   int c;
   while (1) {
     c = fread(buf, sizeof(buf[0]), sizeof(buf) / sizeof(buf[0]), fp_send);
@@ -92,12 +99,12 @@ void* send_thread_func(void* arg) {
       finish("fread");
     }
     if (c > 0) {
-      char encoded_buf[512];
+      char encoded_buf[BUFFER_SIZE];
       int encoded_len = encode(buf, c, encoded_buf);
 
       if (sendData(encoded_buf, encoded_len) < 0) {
         pclose(fp_send);
-        finish("write");
+        finish("write encoded_buf");
       }
     }
   }

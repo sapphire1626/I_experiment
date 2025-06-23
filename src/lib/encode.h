@@ -1,5 +1,10 @@
 #pragma once
 
+#define BUFFER_SIZE 1024
+#define SAMPLE_RATE 44100
+#define MIN_FREQ 300
+#define MAX_FREQ 3400
+
 /// @return output length
 int encode(const char* input, int input_len, char* output);
 
