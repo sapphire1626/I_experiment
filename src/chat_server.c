@@ -10,7 +10,7 @@
 #include <unistd.h>
 
 #define GATE_PORT 16260
-#define MAX_PORT 16270
+#define MAX_PORT 16280
 #define BUF_SIZE 1024
 
 enum PortStatus {
@@ -54,6 +54,12 @@ void udp_server(int port, client_table_t *client_table) {
     exit(1);
   }
 
+  // タイムアウト設定（例: 10秒）
+  struct timeval tv;
+  tv.tv_sec = 10;
+  tv.tv_usec = 0;
+  setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
   // 待ち受けソケットを設定してsockfdにbind
   struct sockaddr_in serv_addr;
   memset(&serv_addr, 0, sizeof(serv_addr));
@@ -77,7 +83,11 @@ void udp_server(int port, client_table_t *client_table) {
         recvfrom(sockfd, buf, BUF_SIZE, 0,
                  (struct sockaddr *)&client_table->clients[table_index].addr,
                  &client_table->clients[table_index].addr_len);
-    if (n < 0) break;
+    if (n < 0) {
+      // タイムアウトまたはエラー
+      perror("recvfrom (timeout or error)");
+      break;
+    }
 
     client_table->clients[table_index].status = PORT_CONNECTED;
 
@@ -108,6 +118,7 @@ void udp_server(int port, client_table_t *client_table) {
   }
   close(sockfd);
   client_table->clients[table_index].status = PORT_FREE;
+  printf("client at port %d disconnected (timeout or error)\n", port);
 }
 
 int gate_sock = -1, gate_newsock = -1;
