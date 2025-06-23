@@ -97,3 +97,69 @@ int decode(const char* input, int input_len, char* output) {
     return (int)decompressed_size;
 }
 
+// --- n人用encode（merged_buf受け取り→分離→個別ノイズキャンセル→再merge→圧縮）---
+// int encode_n(const short* interleaved_in, int n, int len, char* output) {
+//     // 1. 分離
+//     short** tmps = malloc(sizeof(short*) * n);
+//     for (int i = 0; i < n; i++) {
+//         tmps[i] = malloc(sizeof(short) * len);
+//         for (int j = 0; j < len; j++) {
+//             tmps[i][j] = interleaved_in[n * j + i];
+//         }
+//     }
+//     // 2. 個別ノイズキャンセル
+//     for (int i = 0; i < n; i++) {
+//         bandpass_noise_byebye(tmps[i], len);
+//     }
+//     // 3. 再merge
+//     short* merged = malloc(sizeof(short) * len * n);
+//     for (int j = 0; j < len; j++) {
+//         for (int i = 0; i < n; i++) {
+//             merged[n * j + i] = tmps[i][j];
+//         }
+//     }
+//     // 4. 圧縮
+//     size_t max_compressed = ZSTD_compressBound(len * n * sizeof(short));
+//     size_t compressed_size = ZSTD_compress(output, max_compressed, merged, len * n * sizeof(short), 1);
+//     for (int i = 0; i < n; i++) free(tmps[i]);
+//     free(tmps);
+//     free(merged);
+//     if (ZSTD_isError(compressed_size)) {
+//         fprintf(stderr, "ZSTD_compress error: %s\n", ZSTD_getErrorName(compressed_size));
+//         return 0;
+//     }
+//     return (int)compressed_size;
+// }
+
+// --- n人用decode（解凍→分離→ミキシング）---
+// int decode_n(const char* input, int input_len, short* mixed_out, int n, int len) {
+//     // 1. 解凍
+//     short* merged = malloc(sizeof(short) * len * n);
+//     size_t decompressed_size = ZSTD_decompress(merged, len * n * sizeof(short), input, input_len);
+//     if (ZSTD_isError(decompressed_size)) {
+//         fprintf(stderr, "ZSTD_decompress error: %s\n", ZSTD_getErrorName(decompressed_size));
+//         free(merged);
+//         return 0;
+//     }
+//     // 2. 分離
+//     short** tmps = malloc(sizeof(short*) * n);
+//     for (int i = 0; i < n; i++) {
+//         tmps[i] = malloc(sizeof(short) * len);
+//         for (int j = 0; j < len; j++) {
+//             tmps[i][j] = merged[n * j + i];
+//         }
+//     }
+//     // 3. ミキシング
+//     for (int j = 0; j < len; j++) {
+//         int sum = 0;
+//         for (int i = 0; i < n; i++) sum += tmps[i][j];
+//         sum /= n;
+//         if (sum > 32767) sum = 32767;
+//         if (sum < -32768) sum = -32768;
+//         mixed_out[j] = (short)sum;
+//     }
+//     for (int i = 0; i < n; i++) free(tmps[i]);
+//     free(tmps);
+//     free(merged);
+//     return len;
+// }
