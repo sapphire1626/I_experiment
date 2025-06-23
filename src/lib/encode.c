@@ -74,18 +74,51 @@ void bandpass_noise_byebye(short* data, int len) {
   fftw_free(y);
 }
 
+// 符号変化の回数でノイズ検知
+int is_noisy_zcr(const short* data, int nsamp, double zcr_th) {
+    int zcr = 0;
+    for (int i = 1; i < nsamp; i++) {
+        if ((data[i-1] < 0 && data[i] >= 0) || (data[i-1] >= 0 && data[i] < 0)) {
+            zcr++;
+        }
+    }
+    double zcr_rate = (double)zcr / nsamp;
+    return (zcr_rate > zcr_th);
+}
+
 int encode(const char* input, int input_len, char* output) {
-  // バンドパス+ノイズ軽減+圧縮
-  bandpass_noise_byebye((short*)input, input_len / 2);
-  size_t max_compressed = ZSTD_compressBound(input_len);
-  size_t compressed_size =
-      ZSTD_compress(output, max_compressed, input, input_len, 1);
-  if (ZSTD_isError(compressed_size)) {
-    fprintf(stderr, "ZSTD_compress error: %s\n",
-            ZSTD_getErrorName(compressed_size));
-    return 0;
-  }
-  return (int)compressed_size;
+    static int noise_detect_count = 0; // ノイズ検知回数
+    static int noise_cancel_time = 0; // ノイズキャンセルモードの残り時間
+    int nsamp = input_len / 2;
+    double frame_sec = (double)nsamp / SAMPLE_RATE; // 1サンプルの秒数
+    int force_frames_10s = (int)(10.0 / frame_sec + 0.5); // 10秒のサンプル数
+    double zcr_threshold = 0.2; // 閾値
+    int noise_detected = is_noisy_zcr((short*)input, nsamp, zcr_threshold);
+    if (noise_cancel_time > 0) {
+        noise_cancel_time--;
+        fprintf(stderr, "[encode] noise_cancel (remain %.1fs)\n", noise_cancel_time * frame_sec);
+        bandpass_noise_byebye((short*)input, nsamp);
+    } else if (noise_detected) {
+        noise_detect_count++;
+        fprintf(stderr, "[encode] ZCR noise detected: count=%d\n", noise_detect_count);
+        if (noise_detect_count >= 3) { // 3回連続検知で10秒ON
+            noise_cancel_time = force_frames_10s;
+            noise_detect_count = 0;
+            fprintf(stderr, "[encode] Noise detected 3 times: noise cancel ON for 10s\n");
+            bandpass_noise_byebye((short*)input, nsamp);
+        } else {
+            bandpass_noise_byebye((short*)input, nsamp);
+        }
+    } else {
+        noise_detect_count = 0;
+    }
+    size_t max_compressed = ZSTD_compressBound(input_len);
+    size_t compressed_size = ZSTD_compress(output, max_compressed, input, input_len, 1);
+    if (ZSTD_isError(compressed_size)) {
+        fprintf(stderr, "ZSTD_compress error: %s\n", ZSTD_getErrorName(compressed_size));
+        return 0;
+    }
+    return (int)compressed_size;
 }
 
 int decode(const char* input, int input_len, char* output) {
@@ -98,3 +131,70 @@ int decode(const char* input, int input_len, char* output) {
   }
   return (int)decompressed_size;
 }
+
+// --- n人用encode（merged_buf受け取り→分離→個別ノイズキャンセル→再merge→圧縮）---
+// int encode_n(const short* interleaved_in, int n, int len, char* output) {
+//     // 1. 分離
+//     short** tmps = malloc(sizeof(short*) * n);
+//     for (int i = 0; i < n; i++) {
+//         tmps[i] = malloc(sizeof(short) * len);
+//         for (int j = 0; j < len; j++) {
+//             tmps[i][j] = interleaved_in[n * j + i];
+//         }
+//     }
+//     // 2. 個別ノイズキャンセル
+//     for (int i = 0; i < n; i++) {
+//         bandpass_noise_byebye(tmps[i], len);
+//     }
+//     // 3. 再merge
+//     short* merged = malloc(sizeof(short) * len * n);
+//     for (int j = 0; j < len; j++) {
+//         for (int i = 0; i < n; i++) {
+//             merged[n * j + i] = tmps[i][j];
+//         }
+//     }
+//     // 4. 圧縮
+//     size_t max_compressed = ZSTD_compressBound(len * n * sizeof(short));
+//     size_t compressed_size = ZSTD_compress(output, max_compressed, merged, len * n * sizeof(short), 1);
+//     for (int i = 0; i < n; i++) free(tmps[i]);
+//     free(tmps);
+//     free(merged);
+//     if (ZSTD_isError(compressed_size)) {
+//         fprintf(stderr, "ZSTD_compress error: %s\n", ZSTD_getErrorName(compressed_size));
+//         return 0;
+//     }
+//     return (int)compressed_size;
+// }
+
+// --- n人用decode（解凍→分離→ミキシング）---
+// int decode_n(const char* input, int input_len, short* mixed_out, int n, int len) {
+//     // 1. 解凍
+//     short* merged = malloc(sizeof(short) * len * n);
+//     size_t decompressed_size = ZSTD_decompress(merged, len * n * sizeof(short), input, input_len);
+//     if (ZSTD_isError(decompressed_size)) {
+//         fprintf(stderr, "ZSTD_decompress error: %s\n", ZSTD_getErrorName(decompressed_size));
+//         free(merged);
+//         return 0;
+//     }
+//     // 2. 分離
+//     short** tmps = malloc(sizeof(short*) * n);
+//     for (int i = 0; i < n; i++) {
+//         tmps[i] = malloc(sizeof(short) * len);
+//         for (int j = 0; j < len; j++) {
+//             tmps[i][j] = merged[n * j + i];
+//         }
+//     }
+//     // 3. ミキシング
+//     for (int j = 0; j < len; j++) {
+//         int sum = 0;
+//         for (int i = 0; i < n; i++) sum += tmps[i][j];
+//         sum /= n;
+//         if (sum > 32767) sum = 32767;
+//         if (sum < -32768) sum = -32768;
+//         mixed_out[j] = (short)sum;
+//     }
+//     for (int i = 0; i < n; i++) free(tmps[i]);
+//     free(tmps);
+//     free(merged);
+//     return len;
+// }
