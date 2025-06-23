@@ -75,9 +75,44 @@ void bandpass_noise_byebye(short* data, int len) {
     fftw_free(y);
 }
 
+// 符号変化の回数でノイズ検知
+int is_noisy_zcr(const short* data, int nsamp, double zcr_th) {
+    int zcr = 0;
+    for (int i = 1; i < nsamp; i++) {
+        if ((data[i-1] < 0 && data[i] >= 0) || (data[i-1] >= 0 && data[i] < 0)) {
+            zcr++;
+        }
+    }
+    double zcr_rate = (double)zcr / nsamp;
+    return (zcr_rate > zcr_th);
+}
+
 int encode(const char* input, int input_len, char* output) {
-    // バンドパス+ノイズ軽減+圧縮
-    bandpass_noise_byebye((short*)input, input_len / 2);
+    static int noise_detect_count = 0; // ノイズ検知回数
+    static int noise_cancel_time = 0; // ノイズキャンセルモードの残り時間
+    int nsamp = input_len / 2;
+    double frame_sec = (double)nsamp / SAMPLE_RATE; // 1サンプルの秒数
+    int force_frames_10s = (int)(10.0 / frame_sec + 0.5); // 10秒のサンプル数
+    double zcr_threshold = 0.2; // 閾値
+    int noise_detected = is_noisy_zcr((short*)input, nsamp, zcr_threshold);
+    if (noise_cancel_time > 0) {
+        noise_cancel_time--;
+        fprintf(stderr, "[encode] noise_cancel (remain %.1fs)\n", noise_cancel_time * frame_sec);
+        bandpass_noise_byebye((short*)input, nsamp);
+    } else if (noise_detected) {
+        noise_detect_count++;
+        fprintf(stderr, "[encode] ZCR noise detected: count=%d\n", noise_detect_count);
+        if (noise_detect_count >= 3) { // 3回連続検知で10秒ON
+            noise_cancel_time = force_frames_10s;
+            noise_detect_count = 0;
+            fprintf(stderr, "[encode] Noise detected 3 times: noise cancel ON for 10s\n");
+            bandpass_noise_byebye((short*)input, nsamp);
+        } else {
+            bandpass_noise_byebye((short*)input, nsamp);
+        }
+    } else {
+        noise_detect_count = 0;
+    }
     size_t max_compressed = ZSTD_compressBound(input_len);
     size_t compressed_size = ZSTD_compress(output, max_compressed, input, input_len, 1);
     if (ZSTD_isError(compressed_size)) {

@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "lib/encode.h"
@@ -119,6 +120,10 @@ void* send_thread_func(void* arg) {
   }
   char buf[BUFFER_SIZE];
   int c;
+  // // ここから
+  // static int seeded = 0;
+  // if (!seeded) { srand((unsigned)time(NULL)); seeded = 1; }
+  // // ここまで
   while (1) {
     c = fread(buf, sizeof(buf[0]), sizeof(buf) / sizeof(buf[0]), fp_send);
     if (c < 0) {
@@ -126,6 +131,18 @@ void* send_thread_func(void* arg) {
       finish("fread");
     }
     if (c > 0) {
+      // // --- ノイズ付加 ---
+      // short* pcm = (short*)buf;
+      // int nsamp = c / 2; // short型PCMサンプル数
+      // int NOISE_LEVEL = 1000; // ノイズ強度（調整可）
+      // for (int i = 0; i < nsamp; i++) {
+      //   int noise = (rand() % (2 * NOISE_LEVEL)) - NOISE_LEVEL; // -NOISE_LEVEL～+NOISE_LEVEL
+      //   int v = pcm[i] + noise;
+      //   if (v > 32767) v = 32767;
+      //   if (v < -32768) v = -32768;
+      //   pcm[i] = (short)v;
+      // }
+      // // --- ノイズ付加ここまで ---
       char encoded_buf[BUFFER_SIZE];
       int encoded_len = encode(buf, c, encoded_buf);
       // まずencoded_lenを送信
