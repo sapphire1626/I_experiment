@@ -23,7 +23,8 @@ FILE* fp;
 /// @param argv[1] サーバIPアドレス
 /// @param argv[2] オプションでWAVファイル名
 /// @param -m: muteオプション（音声入力をミュート）
-/// @param -h: holdオプション（データを送信しなくてもサーバから切断されなくなる）
+/// @param -h:
+/// holdオプション（データを送信しなくてもサーバから切断されなくなる）
 int main(int argc, char* argv[]) {
   if (argc < 2) {
     printf("Usage: %s <server address> [wavfile]\n", argv[0]);
@@ -64,6 +65,13 @@ int main(int argc, char* argv[]) {
     }
     if (pthread_create(&send_thread, NULL, send_thread_func, arg) != 0) {
       finish("pthread_create");
+    }
+  } else {
+    // 送信しないとそもそもサーバに認識してもらえないので何かしら送る
+    char dummy_buf[DATA_SIZE] = {0};
+    int dummy_len = encode(dummy_buf, sizeof(dummy_buf), dummy_buf);
+    if (sendData(dummy_buf, dummy_len) < 0) {
+      finish("send dummy data");
     }
   }
 
