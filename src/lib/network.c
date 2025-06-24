@@ -122,7 +122,13 @@ int sendData(const void* buf, int len) {
   uint8_t packet[RTP_HEADER_SIZE + len];
   makeRTPHeader((RTPHeader*)packet, rtp_seq++, rtp_timestamp,
                 communication_port);
+  // 16bit PCMデータをリトル→ビッグエンディアン変換
   memcpy(packet + RTP_HEADER_SIZE, buf, len);
+  const int sample_count = len / 2;
+  uint16_t* pcm = (uint16_t*)(packet + RTP_HEADER_SIZE);
+  for (int i = 0; i < sample_count; i++) {
+    pcm[i] = htons(pcm[i]);
+  }
   rtp_timestamp += len;  // サンプル数分進める（用途に応じて調整）
   return sendto(communication_sock, packet, RTP_HEADER_SIZE + len, 0,
                 (struct sockaddr*)&addr_send, sizeof(addr_send));
@@ -186,6 +192,12 @@ int getDataBuffer(int port, uint8_t* data) {
   // count[idx]);
   int len = data_lengths[idx][tail[idx]];
   memcpy(data, data_buffer[idx][tail[idx]], len);
+  // 16bit PCMデータをビッグ→リトルエンディアン変換
+  const int sample_count = len / 2;
+  uint16_t* pcm = (uint16_t*)data;
+  for (int i = 0; i < sample_count; i++) {
+    pcm[i] = ntohs(pcm[i]);
+  }
   tail[idx] = (tail[idx] + 1) % RING_SIZE;
   count[idx]--;
   pthread_mutex_unlock(&data_mutex);
