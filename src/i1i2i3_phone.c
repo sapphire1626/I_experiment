@@ -37,15 +37,21 @@ void finish(const char* cmd) {
 ///@param argv[1] サーバIPアドレス
 int main(int argc, char* argv[]) {
   const char* ip_addr = argv[1];
-  if (argc != 2) {
-    printf("Usage: %s <server address>\n", argv[0]);
+  if (argc < 2 || argc > 3) {
+    printf("Usage: %s <server address> [wavfile|rec]\n", argv[0]);
     return 1;
   }
   setup(ip_addr);
 
   // 送信スレッド作成
   pthread_t send_thread;
-  if (pthread_create(&send_thread, NULL, send_thread_func, NULL) != 0) {
+  void* arg = NULL;
+  if (argc == 3) {
+    if (strcmp(argv[2], "rec") != 0) {
+      arg = argv[2];  // wavファイルパス
+    }
+  }
+  if (pthread_create(&send_thread, NULL, send_thread_func, arg) != 0) {
     perror("pthread_create");
     finish("pthread_create");
   }
@@ -76,7 +82,20 @@ int main(int argc, char* argv[]) {
 
 // 送信スレッド用関数
 void* send_thread_func(void* arg) {
-  char* cmdline = "rec -t raw -b 16 -c 1 -e s -r 44100 -";
+  char* cmdline;
+  if (arg == NULL) {
+    // デフォルト: rec
+    cmdline = "rec -t raw -b 16 -c 1 -e s -r 44100 -";
+    printf("Using rec for audio input\n");
+  } else {
+    // WAVファイル指定時: soxでraw変換
+    char* wavfile = (char*)arg;
+    static char buf[256];
+    snprintf(buf, sizeof(buf), "sox '%s' -t raw -b 16 -c 1 -e s -r 44100 -",
+             wavfile);
+    cmdline = buf;
+    printf("Using %s for audio input\n", wavfile);
+  }
   FILE* fp_send = popen(cmdline, "r");
   if (fp_send == NULL) {
     perror("can not exec command");
