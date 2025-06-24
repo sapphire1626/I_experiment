@@ -22,6 +22,8 @@ FILE* fp;
 
 /// @param argv[1] サーバIPアドレス
 /// @param argv[2] オプションでWAVファイル名
+/// @param -m: muteオプション（音声入力をミュート）
+/// @param -h: holdオプション（データを送信しなくてもサーバから切断されなくなる）
 int main(int argc, char* argv[]) {
   if (argc < 2) {
     printf("Usage: %s <server address> [wavfile]\n", argv[0]);
@@ -31,16 +33,23 @@ int main(int argc, char* argv[]) {
   const char* ip_addr = argv[1];
 
   uint8_t hold = 0;
+  uint8_t mute = 0;
   for (int i = 2; i < argc; i++) {
     if (argv[i][0] != '-') {
       continue;
     }
 
-    if (argv[i][1] == 'h') {
-      hold = 1;  // -hオプションでholdを有効にする
-    } else {
-      fprintf(stderr, "Unknown option: %s\n", argv[i]);
-      return 1;
+    switch (argv[i][1]) {
+      case 'h':
+        hold = 1;  // -hオプションでholdを有効にする
+        break;
+      case 'm':
+        mute = 1;  // -mオプションでmuteを有効にする
+        hold = 1;
+        break;
+      default:
+        fprintf(stderr, "Unknown option: %s\n", argv[i]);
+        return 1;
     }
   }
 
@@ -48,12 +57,14 @@ int main(int argc, char* argv[]) {
 
   // 送信スレッド作成
   pthread_t send_thread;
-  void* arg = NULL;
-  if (argc == 3) {
-    arg = argv[2];
-  }
-  if (pthread_create(&send_thread, NULL, send_thread_func, arg) != 0) {
-    finish("pthread_create");
+  if (mute == 0) {
+    void* arg = NULL;
+    if (argc == 3) {
+      arg = argv[2];
+    }
+    if (pthread_create(&send_thread, NULL, send_thread_func, arg) != 0) {
+      finish("pthread_create");
+    }
   }
 
   char recv_buf[DATA_SIZE * (MAX_PORT - GATE_PORT)];
