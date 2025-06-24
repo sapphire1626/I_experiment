@@ -20,6 +20,8 @@ target_include_directories(lib PUBLIC /opt/homebrew/include)
 target_link_libraries(lib /opt/homebrew/lib/libfftw3.dylib)
 target_include_directories(lib PUBLIC /opt/homebrew/include)
 target_link_libraries(lib /opt/homebrew/lib/libzstd.dylib)
+target_include_directories(lib PUBLIC /opt/homebrew/include)
+target_link_libraries(lib /opt/homebrew/lib/libspeexdsp.dylib)
 
 foreach(SRC_FILE ${SRC_FILES})
     get_filename_component(BIN_NAME ${SRC_FILE} NAME_WE)

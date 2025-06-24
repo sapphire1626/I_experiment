@@ -11,6 +11,8 @@
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
+#include <speex/speex_echo.h>
+#include <speex/speex_preprocess.h>
 
 #include "lib/encode.h"
 #include "lib/network.h"
@@ -20,6 +22,15 @@
 void finish(const char* cmd);
 void* send_thread_func(void* arg);
 FILE* fp;
+
+// --- グローバルに直前のmix_bufを保存 ---
+short last_mix_buf[DATA_SIZE / 2] = {0};
+pthread_mutex_t mix_buf_mutex = PTHREAD_MUTEX_INITIALIZER;
+// --- SpeexDSP echo canceller state ---
+SpeexEchoState *echo_state = NULL;
+SpeexPreprocessState *preprocess_state = NULL;
+int frame_size = 960; // 20ms@48kHz, Speex推奨値
+int sample_rate = 48000; // 48000Hzに統一
 
 int is_port_muted(int port, int* muted_ports, int muted_count) {
   for (int i = 0; i < muted_count; i++) {
@@ -63,6 +74,12 @@ int main(int argc, char* argv[]) {
   }
 
   setup(ip_addr, hold);
+  // --- speex echo canceller初期化 ---
+  int filter_length = sample_rate / 4; // 0.25秒
+  echo_state = speex_echo_state_init(frame_size, filter_length);
+  preprocess_state = speex_preprocess_state_init(frame_size, sample_rate);
+  speex_echo_ctl(echo_state, SPEEX_ECHO_SET_SAMPLING_RATE, &sample_rate);
+  speex_preprocess_ctl(preprocess_state, SPEEX_PREPROCESS_SET_ECHO_STATE, echo_state);
 
   // 送信スレッド作成
   pthread_t send_thread;
@@ -142,6 +159,9 @@ int main(int argc, char* argv[]) {
     }
     if (mix_count > 0) {
       mixing(pcm_ptrs, mix_count, max_samples, mix_buf);
+      pthread_mutex_lock(&mix_buf_mutex);
+      memcpy(last_mix_buf, mix_buf, max_samples * 2);
+      pthread_mutex_unlock(&mix_buf_mutex);
       if (write(STDOUT_FILENO, mix_buf, max_samples * 2) < 0) {
         finish("write");
       }
@@ -160,13 +180,13 @@ void* send_thread_func(void* arg) {
   char* cmdline;
   if (arg == NULL) {
     // デフォルト: rec
-    cmdline = "rec -t raw -b 16 -c 1 -e s -r 44100 -";
+    cmdline = "rec -t raw -b 16 -c 1 -e s -r 48000 -";
     printf("Using rec for audio input\n");
   } else {
     // WAVファイル指定時: soxでraw変換
     char* wavfile = (char*)arg;
     static char buf[256];
-    snprintf(buf, sizeof(buf), "sox '%s' -t raw -b 16 -c 1 -e s -r 44100 -",
+    snprintf(buf, sizeof(buf), "sox '%s' -t raw -b 16 -c 1 -e s -r 48000 -",
              wavfile);
     cmdline = buf;
     printf("Using %s for audio input\n", wavfile);
@@ -180,30 +200,33 @@ void* send_thread_func(void* arg) {
 
   char buf[DATA_SIZE];
   int c;
+  short echo_buf[960]; // frame_size分
+  short clean_buf[960];
   // // ここから
   // static int seeded = 0;
   // if (!seeded) { srand((unsigned)time(NULL)); seeded = 1; }
   // // ここまで
   while (1) {
-    c = fread(buf, sizeof(buf[0]), sizeof(buf) / sizeof(buf[0]), fp_send);
+    c = fread(buf, sizeof(buf[0]), frame_size * 2, fp_send); // 960サンプル分ずつ
     if (c < 0) {
       pclose(fp_send);
       finish("fread");
     }
     if (c > 0) {
-      // // --- ノイズ付加 ---
-      // short* pcm = (short*)buf;
-      // int nsamp = c / 2; // short型PCMサンプル数
-      // int NOISE_LEVEL = 1000; // ノイズ強度（調整可）
-      // for (int i = 0; i < nsamp; i++) {
-      //   int noise = (rand() % (2 * NOISE_LEVEL)) - NOISE_LEVEL; //
-      //   -NOISE_LEVEL～+NOISE_LEVEL int v = pcm[i] + noise; if (v > 32767) v =
-      //   32767; if (v < -32768) v = -32768; pcm[i] = (short)v;
-      // }
-      // // --- ノイズ付加ここまで ---
+      pthread_mutex_lock(&mix_buf_mutex);
+      memcpy(echo_buf, last_mix_buf, frame_size * 2); // 直前のmix_bufをecho参照に
+      pthread_mutex_unlock(&mix_buf_mutex);
+      short* mic = (short*)buf;
+      int nsamp = c / 2;
+      if (nsamp == frame_size) {
+        howling_byebye(mic, echo_buf, frame_size, sample_rate, echo_state, preprocess_state);
+        memcpy(clean_buf, mic, frame_size * 2);
+      } else {
+        // フレームサイズ未満はそのまま
+        memcpy(clean_buf, mic, nsamp * 2);
+      }
       char encoded_buf[DATA_SIZE];
-      int encoded_len = encode(buf, c, encoded_buf);
-
+      int encoded_len = encode((char*)clean_buf, nsamp * 2, encoded_buf);
       if (sendData(encoded_buf, encoded_len) < 0) {
         pclose(fp_send);
         finish("write encoded_buf");

@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <zstd.h>
+#include <speex/speex_echo.h>
+#include <speex/speex_preprocess.h>
 
 #include "params.h"
 
@@ -15,6 +17,22 @@ static float noise_mag[DATA_SIZE / 2] = {0};
 static int noise_est_count = 0;
 
 void bandpass_noise_byebye(short* data, int len) {
+  // 音声区間ごとにノイズ推定をリセット（推定値が古いまま残らないように）
+  static int prev_silence = 1;
+  int is_silence = 1;
+  for (int i = 0; i < len; i++) {
+    if (abs(data[i]) > 500) { // 適当な閾値
+      is_silence = 0;
+      break;
+    }
+  }
+  if (!is_silence && prev_silence) {
+    // 無音→音声に遷移したらノイズ推定リセット
+    noise_est_count = 0;
+    memset(noise_mag, 0, sizeof(noise_mag));
+  }
+  prev_silence = is_silence;
+
   int n = len;
   fftw_complex* x = fftw_malloc(sizeof(fftw_complex) * n);
   fftw_complex* y = fftw_malloc(sizeof(fftw_complex) * n);
@@ -30,7 +48,7 @@ void bandpass_noise_byebye(short* data, int len) {
   fftw_execute(plan_fwd);
 
   // 300Hz～3400Hz
-  double df = 44100.0 / n;
+  double df = 48000.0 / n;
   int k_low = (int)(300 / df + 0.5);
   int k_high = (int)(3400 / df + 0.5);
   for (int k = 0; k < n; k++) {
@@ -220,4 +238,18 @@ void mixing(short** bufs, int n, int len, short* out) {
         if (v < -32768) v = -32768;
         out[j] = (short)v;
     }
+}
+
+// ハウリング防止（エコーキャンセル）
+// mic_in: マイク入力PCM, ref_out: 直前のスピーカー出力PCM, len: サンプル数, sample_rate: サンプリング周波数
+// echo_state/preprocess_stateは初期化済みのものを渡す
+void howling_byebye(short* mic_in, const short* ref_out, int len, int sample_rate, SpeexEchoState* echo_state, SpeexPreprocessState* preprocess_state) {
+    // ref_out: スピーカー出力（直前のmix_buf）
+    // mic_in: マイク入力
+    // len: frame_size
+    // echo_state, preprocess_state: 初期化済み
+    short clean[len];
+    speex_echo_cancellation(echo_state, mic_in, ref_out, clean);
+    speex_preprocess_run(preprocess_state, clean);
+    memcpy(mic_in, clean, sizeof(short) * len);
 }
