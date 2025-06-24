@@ -35,7 +35,7 @@ typedef struct {
 void makeRTPHeader(RTPHeader* header, uint16_t seq, uint32_t ts,
                    uint32_t ssrc) {
   header->vpxcc = 0x80;  // Version 2, no padding, no extension, CC=0
-  header->mpt = 0x00;    // M=0, PT=0 (PCMU)
+  header->mpt = 0x0B;    // M=0, PT=11
   header->seq = htons(seq);
   header->timestamp = htonl(ts);
   header->ssrc = htonl(ssrc);
