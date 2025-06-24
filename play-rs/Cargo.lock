@@ -516,6 +516,7 @@ version = "0.1.0"
 dependencies = [
  "byteorder",
  "rodio",
+ "rtp-rs",
 ]
 
 [[package]]
@@ -592,6 +593,12 @@ dependencies = [
  "lewton",
  "symphonia",
 ]
+
+[[package]]
+name = "rtp-rs"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4ed274a5b3d36c4434cff6a4de1b42f43e64ae326b1cfa72d13d9037a314355"
 
 [[package]]
 name = "rustc-hash"
