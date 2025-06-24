@@ -44,7 +44,7 @@ int find_free_client(client_table_t *table) {
   return -1;
 }
 
-void udp_server(int port, client_table_t *client_table) {
+void udp_server(int port, client_table_t *client_table, uint8_t hold) {
   const int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
   const int table_index = port - GATE_PORT;
   if (sockfd < 0) {
@@ -52,11 +52,13 @@ void udp_server(int port, client_table_t *client_table) {
     exit(1);
   }
 
-  // タイムアウト設定（例: 10秒）
-  struct timeval tv;
-  tv.tv_sec = 10;
-  tv.tv_usec = 0;
-  setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+  if (hold == 0) {
+    // タイムアウト設定（例: 10秒）
+    struct timeval tv;
+    tv.tv_sec = 10;
+    tv.tv_usec = 0;
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+  }
 
   // 待ち受けソケットを設定してsockfdにbind
   struct sockaddr_in serv_addr;
@@ -89,7 +91,7 @@ void udp_server(int port, client_table_t *client_table) {
 
     client_table->clients[table_index].status = PORT_CONNECTED;
 
-    // // 送信
+    // 送信
     const int num_clients = MAX_PORT - GATE_PORT;
     for (int i = 1; i < num_clients; i++) {
       if (client_table->clients[i].status != PORT_CONNECTED) {
@@ -134,14 +136,16 @@ void on_finish() {
 typedef struct {
   int port;
   client_table_t *client_table;
+  uint8_t hold;
 } udp_server_arg_t;
 
-void *udp_echo_server_thread(void *arg) {
+void *udp_server_thread_fn(void *arg) {
   udp_server_arg_t *server_arg = (udp_server_arg_t *)arg;
   int port = server_arg->port;
   client_table_t *client_table = server_arg->client_table;
+  uint8_t hold = server_arg->hold;
   free(server_arg);
-  udp_server(port, client_table);
+  udp_server(port, client_table, hold);
   return NULL;
 }
 
@@ -192,6 +196,14 @@ int main() {
     // ポート番号をクライアントに送信
     uint16_t port_u16 = htons(p);  // バイトオーダの調整
     write(gate_newsock, &port_u16, sizeof(port_u16));
+
+    // hold指令を受け取る
+    uint8_t hold;
+    if (read(gate_newsock, &hold, sizeof(hold)) < 0) {
+      perror("read");
+      continue;
+    }
+
     close(gate_newsock);
 
     // スレッドでUDP echoサーバ起動
@@ -199,7 +211,8 @@ int main() {
     udp_server_arg_t *arg = malloc(sizeof(udp_server_arg_t));
     arg->port = p;
     arg->client_table = &client_table;
-    if (pthread_create(&tid, NULL, udp_echo_server_thread, arg) != 0) {
+    arg->hold = hold;
+    if (pthread_create(&tid, NULL, udp_server_thread_fn, arg) != 0) {
       perror("pthread_create");
       free(arg);
       continue;

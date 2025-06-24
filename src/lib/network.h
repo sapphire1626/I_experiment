@@ -1,5 +1,5 @@
 #pragma once
-
+#include <stdint.h>
 /// @brief 受信データを取得する
 /// @param buf 音声データを受けるポインタ. DATA_SIZE x (MAX_PORT -
 /// GATE_PORT)のサイズ
@@ -9,4 +9,4 @@
 int receiveData(void* buf, int lens[], int ports[]);
 int sendData(const void* buf, int len);
 void cleanUp();
-void setup(const char* ip_addr);
+void setup(const char* ip_add, uint8_t hold);

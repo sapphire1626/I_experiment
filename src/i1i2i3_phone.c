@@ -20,23 +20,37 @@ void finish(const char* cmd);
 void* send_thread_func(void* arg);
 FILE* fp;
 
-
 /// @param argv[1] サーバIPアドレス
 /// @param argv[2] オプションでWAVファイル名
 int main(int argc, char* argv[]) {
-  if (argc < 2 || argc > 3) {
+  if (argc < 2) {
     printf("Usage: %s <server address> [wavfile]\n", argv[0]);
     return 1;
   }
 
   const char* ip_addr = argv[1];
-  setup(ip_addr);
+
+  uint8_t hold = 0;
+  for (int i = 2; i < argc; i++) {
+    if (argv[i][0] != '-') {
+      continue;
+    }
+
+    if (argv[i][1] == 'h') {
+      hold = 1;  // -hオプションでholdを有効にする
+    } else {
+      fprintf(stderr, "Unknown option: %s\n", argv[i]);
+      return 1;
+    }
+  }
+
+  setup(ip_addr, hold);
 
   // 送信スレッド作成
   pthread_t send_thread;
   void* arg = NULL;
   if (argc == 3) {
-      arg = argv[2];
+    arg = argv[2];
   }
   if (pthread_create(&send_thread, NULL, send_thread_func, arg) != 0) {
     finish("pthread_create");

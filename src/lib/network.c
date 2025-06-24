@@ -81,11 +81,12 @@ void* dataReceiveThreadFn(void* arg) {
   }
 }
 
-void setup(const char* ip_addr) {
+void setup(const char* ip_addr, uint8_t hold) {
   // gateにアクセスして通信に使うポートを割り当ててもらう
   struct sockaddr_in gate_addr;
   const int gate_sock = setUpSocketTcp(&gate_addr, ip_addr, GATE_PORT);
   uint16_t port_u16;
+  write(gate_sock, &hold, sizeof(hold));
   read(gate_sock, &port_u16, sizeof(port_u16));
   close(gate_sock);
 
