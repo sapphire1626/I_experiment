@@ -16,43 +16,29 @@
 #include "lib/params.h"
 #include "lib/setup_socket.h"
 
+void finish(const char* cmd);
 void* send_thread_func(void* arg);
 FILE* fp;
 
-void finish(const char* cmd) {
-  if (cmd != NULL) {
-    perror(cmd);
-  }
-  cleanUp();
-  pclose(fp);
 
-  if (cmd != NULL) {
-    exit(EXIT_FAILURE);
-  } else {
-    exit(EXIT_SUCCESS);
-  }
-}
-
-///@brief
-///@param argv[1] サーバIPアドレス
+/// @param argv[1] サーバIPアドレス
+/// @param argv[2] オプションでWAVファイル名
 int main(int argc, char* argv[]) {
-  const char* ip_addr = argv[1];
   if (argc < 2 || argc > 3) {
-    printf("Usage: %s <server address> [wavfile|rec]\n", argv[0]);
+    printf("Usage: %s <server address> [wavfile]\n", argv[0]);
     return 1;
   }
+
+  const char* ip_addr = argv[1];
   setup(ip_addr);
 
   // 送信スレッド作成
   pthread_t send_thread;
   void* arg = NULL;
   if (argc == 3) {
-    if (strcmp(argv[2], "rec") != 0) {
-      arg = argv[2];  // wavファイルパス
-    }
+      arg = argv[2];
   }
   if (pthread_create(&send_thread, NULL, send_thread_func, arg) != 0) {
-    perror("pthread_create");
     finish("pthread_create");
   }
 
@@ -96,11 +82,13 @@ void* send_thread_func(void* arg) {
     cmdline = buf;
     printf("Using %s for audio input\n", wavfile);
   }
+
   FILE* fp_send = popen(cmdline, "r");
   if (fp_send == NULL) {
     perror("can not exec command");
     finish("popen");
   }
+
   char buf[DATA_SIZE];
   int c;
   // // ここから
@@ -135,4 +123,18 @@ void* send_thread_func(void* arg) {
   }
   pclose(fp_send);
   return NULL;
+}
+
+void finish(const char* cmd) {
+  if (cmd != NULL) {
+    perror(cmd);
+  }
+  cleanUp();
+  pclose(fp);
+
+  if (cmd != NULL) {
+    exit(EXIT_FAILURE);
+  } else {
+    exit(EXIT_SUCCESS);
+  }
 }
