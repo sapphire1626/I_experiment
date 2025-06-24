@@ -53,15 +53,23 @@ int main(int argc, char* argv[]) {
   char recv_buf[DATA_SIZE * (MAX_PORT - GATE_PORT)];
   int length_list[MAX_PORT - GATE_PORT];
   int port_list[MAX_PORT - GATE_PORT];
-  char decoded_buf[DATA_SIZE];
+  char decoded_bufs[MAX_PORT - GATE_PORT][DATA_SIZE];  // 全員のデコード済みデータ
+  short* pcm_ptrs[MAX_PORT - GATE_PORT];
+  short mix_buf[DATA_SIZE / 2];  // ミキシング用
   while (1) {
     // 受信
     int num_clients = receiveData(recv_buf, length_list, port_list);
-
+    int max_samples = 0;
     for (int i = 0; i < num_clients; i++) {
       int decoded_len =
-          decode(recv_buf + DATA_SIZE * i, length_list[i], decoded_buf);
-      if (write(STDOUT_FILENO, decoded_buf, decoded_len) < 0) {
+          decode(recv_buf + DATA_SIZE * i, length_list[i], decoded_bufs[i]);
+      int nsamp = decoded_len / 2;
+      if (nsamp > max_samples) max_samples = nsamp;
+      pcm_ptrs[i] = (short*)decoded_bufs[i];
+    }
+    if (num_clients > 0) {
+      mixing(pcm_ptrs, num_clients, max_samples, mix_buf);
+      if (write(STDOUT_FILENO, mix_buf, max_samples * 2) < 0) {
         finish("write");
       }
     }

@@ -24,3 +24,6 @@ int decode(const char* input, int input_len, char* output);
 // len: 1人分のbuf_size
 // 戻り値: 再生する音声のbuf_size
 // int decode_n(const char* input, int input_len, short** bufs, int n, int len);
+
+// n人分の音声データをミキシング、正規化、クリッピングをして出力
+void mixing(short** bufs, int n, int len, short* out);
