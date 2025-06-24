@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <math.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -19,6 +20,13 @@
 void finish(const char* cmd);
 void* send_thread_func(void* arg);
 FILE* fp;
+
+int is_port_muted(int port, int* muted_ports, int muted_count) {
+  for (int i = 0; i < muted_count; i++) {
+    if (muted_ports[i] == port) return 1;
+  }
+  return 0;
+}
 
 /// @param argv[1] サーバIPアドレス
 /// @param argv[2] オプションでWAVファイル名
@@ -81,19 +89,59 @@ int main(int argc, char* argv[]) {
   char decoded_bufs[MAX_PORT - GATE_PORT][DATA_SIZE];  // 全員のデコード済みデータ
   short* pcm_ptrs[MAX_PORT - GATE_PORT];
   short mix_buf[DATA_SIZE / 2];  // ミキシング用
+  int muted_ports[MAX_PORT - GATE_PORT] = {0};
+  int muted_count = 0;
+  // 標準入力をノンブロッキングに
+  int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+  fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
+
   while (1) {
+    // --- コマンド入力監視 ---
+    char cmd_buf[64];
+    if (fgets(cmd_buf, sizeof(cmd_buf), stdin)) {
+      int port;
+      if (sscanf(cmd_buf, "m %d", &port) == 1) {
+        // ミュート追加
+        int already = 0;
+        for (int i = 0; i < muted_count; i++) if (muted_ports[i] == port) already = 1;
+        if (!already && muted_count < MAX_PORT - GATE_PORT) {
+          muted_ports[muted_count++] = port;
+          fprintf(stderr, "[MUTE] port %d\n", port); fflush(stderr);
+        }
+      } else if (sscanf(cmd_buf, "u %d", &port) == 1) {
+        // ミュート解除
+        for (int i = 0; i < muted_count; i++) {
+          if (muted_ports[i] == port) {
+            for (int j = i; j < muted_count - 1; j++) muted_ports[j] = muted_ports[j + 1];
+            muted_count--;
+            fprintf(stderr, "[UNMUTE] port %d\n", port); fflush(stderr);
+            break;
+          }
+        }
+      } else if (strncmp(cmd_buf, "list", 4) == 0) {
+        // ミュートポート一覧表示
+        fprintf(stderr, "[PORTS LIST]");
+        for (int i = 0; i < 20; i++) {
+          if (port_list[i] == 0) break;
+          fprintf(stderr, " %d", port_list[i]);
+        }
+        fprintf(stderr,  "\n"); fflush(stderr);
+      }
+    }
     // 受信
     int num_clients = receiveData(recv_buf, length_list, port_list);
     int max_samples = 0;
+    int mix_count = 0;
     for (int i = 0; i < num_clients; i++) {
-      int decoded_len =
-          decode(recv_buf + DATA_SIZE * i, length_list[i], decoded_bufs[i]);
+      int decoded_len = decode(recv_buf + DATA_SIZE * i, length_list[i], decoded_bufs[i]);
       int nsamp = decoded_len / 2;
       if (nsamp > max_samples) max_samples = nsamp;
-      pcm_ptrs[i] = (short*)decoded_bufs[i];
+      if (!is_port_muted(port_list[i], muted_ports, muted_count)) {
+        pcm_ptrs[mix_count++] = (short*)decoded_bufs[i];
+      }
     }
-    if (num_clients > 0) {
-      mixing(pcm_ptrs, num_clients, max_samples, mix_buf);
+    if (mix_count > 0) {
+      mixing(pcm_ptrs, mix_count, max_samples, mix_buf);
       if (write(STDOUT_FILENO, mix_buf, max_samples * 2) < 0) {
         finish("write");
       }
