@@ -2,6 +2,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 use rodio::{OutputStream, Sink};
 use rtp_rs::RtpPacketBuilder;
 use rtp_rs::{RtpReader, Seq};
+use std::env;
 use std::io::Read;
 use std::io::prelude::*;
 use std::net::{TcpStream, UdpSocket};
@@ -13,7 +14,10 @@ const SAMPLE_RATE: u32 = 44100;
 const DATA_SIZE: usize = 1024;
 
 fn main() {
-    let mut stream = TcpStream::connect("124.32.255.155:16260").expect("TCP接続失敗");
+    let args: Vec<String> = env::args().collect();
+    let server_ip = &args[1];
+    let server_addr = format!("{}:16260", server_ip);
+    let mut stream = TcpStream::connect(&server_addr).expect("TCP接続失敗");
 
     // holdフラグの送信
     let hold: u8 = 1;
@@ -27,7 +31,7 @@ fn main() {
 
     let socket = UdpSocket::bind("0.0.0.0:0").expect("UDPバインド失敗");
     socket
-        .connect(("124.32.255.155", udp_port))
+        .connect((server_ip.as_str(), udp_port))
         .expect("UDP接続失敗");
 
     let (_stream, stream_handle) = OutputStream::try_default().expect("rodio出力失敗");
