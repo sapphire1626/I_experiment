@@ -10,7 +10,7 @@ file(GLOB LIB_SRC src/lib/*.c)
 add_compile_options(-Og)
 
 add_library(lib ${LIB_SRC})
-target_include_directories(lib PUBLIC src/lib)
+target_include_directories(lib PUBLIC src/lib m)
 if(APPLE)
     target_include_directories(lib PUBLIC /opt/homebrew/include)
     target_link_libraries(lib /opt/homebrew/lib/libfftw3.dylib)
