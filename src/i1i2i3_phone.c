@@ -44,8 +44,10 @@ int main(int argc, char* argv[]) {
   uint8_t hold = 1;
   uint8_t speaking = 0;
   uint8_t listening = 0;
+  char* wavfile = NULL;
   for (int i = 2; i < argc; i++) {
     if (argv[i][0] != '-') {
+      wavfile = argv[i];
       continue;
     }
 
@@ -74,10 +76,7 @@ int main(int argc, char* argv[]) {
   // 送信スレッド作成
   pthread_t send_thread;
   if (speaking == 1) {
-    void* arg = NULL;
-    if (argc == 3) {
-      arg = argv[2];
-    }
+    void* arg = wavfile;
     if (pthread_create(&send_thread, NULL, send_thread_func, arg) != 0) {
       finish("pthread_create");
     }
@@ -231,6 +230,7 @@ void* send_thread_func(void* arg) {
 }
 
 void finish(const char* cmd) {
+  fprintf(stderr, "Finishing... (with cmd: %s)\n", cmd);
   if (cmd != NULL) {
     perror(cmd);
   }
