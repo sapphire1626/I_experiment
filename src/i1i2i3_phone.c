@@ -83,10 +83,12 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  int num_clients = 0;
   char recv_buf[DATA_SIZE * (MAX_PORT - GATE_PORT)];
   int length_list[MAX_PORT - GATE_PORT];
   int port_list[MAX_PORT - GATE_PORT];
-  char decoded_bufs[MAX_PORT - GATE_PORT][DATA_SIZE];  // 全員のデコード済みデータ
+  char decoded_bufs[MAX_PORT - GATE_PORT]
+                   [DATA_SIZE];  // 全員のデコード済みデータ
   short* pcm_ptrs[MAX_PORT - GATE_PORT];
   short mix_buf[DATA_SIZE / 2];  // ミキシング用
   int muted_ports[MAX_PORT - GATE_PORT] = {0};
@@ -103,37 +105,44 @@ int main(int argc, char* argv[]) {
       if (sscanf(cmd_buf, "m %d", &port) == 1) {
         // ミュート追加
         int already = 0;
-        for (int i = 0; i < muted_count; i++) if (muted_ports[i] == port) already = 1;
+        for (int i = 0; i < muted_count; i++) {
+          if (muted_ports[i] == port) already = 1;
+        }
         if (!already && muted_count < MAX_PORT - GATE_PORT) {
           muted_ports[muted_count++] = port;
-          fprintf(stderr, "[MUTE] port %d\n", port); fflush(stderr);
+          fprintf(stderr, "[MUTE] port %d\n", port);
+          fflush(stderr);
         }
       } else if (sscanf(cmd_buf, "u %d", &port) == 1) {
         // ミュート解除
         for (int i = 0; i < muted_count; i++) {
           if (muted_ports[i] == port) {
-            for (int j = i; j < muted_count - 1; j++) muted_ports[j] = muted_ports[j + 1];
+            for (int j = i; j < muted_count - 1; j++) {
+              muted_ports[j] = muted_ports[j + 1];
+            }
             muted_count--;
-            fprintf(stderr, "[UNMUTE] port %d\n", port); fflush(stderr);
+            fprintf(stderr, "[UNMUTE] port %d\n", port);
+            fflush(stderr);
             break;
           }
         }
       } else if (strncmp(cmd_buf, "list", 4) == 0) {
         // ミュートポート一覧表示
         fprintf(stderr, "[PORTS LIST]");
-        for (int i = 0; i < 20; i++) {
-          if (port_list[i] == 0) break;
+        for (int i = 0; i < num_clients; i++) {
           fprintf(stderr, " %d", port_list[i]);
         }
-        fprintf(stderr,  "\n"); fflush(stderr);
+        fprintf(stderr, "\n");
+        fflush(stderr);
       }
     }
     // 受信
-    int num_clients = receiveData(recv_buf, length_list, port_list);
+    num_clients = receiveData(recv_buf, length_list, port_list);
     int max_samples = 0;
     int mix_count = 0;
     for (int i = 0; i < num_clients; i++) {
-      int decoded_len = decode(recv_buf + DATA_SIZE * i, length_list[i], decoded_bufs[i]);
+      int decoded_len =
+          decode(recv_buf + DATA_SIZE * i, length_list[i], decoded_bufs[i]);
       int nsamp = decoded_len / 2;
       if (nsamp > max_samples) max_samples = nsamp;
       if (!is_port_muted(port_list[i], muted_ports, muted_count)) {
