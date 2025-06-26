@@ -164,7 +164,7 @@ int main(int argc, char* argv[]) {
   }
 
   // スレッド終了待ち
-  pthread_cancel(send_thread);
+  // pthread_cancel(send_thread);
   pthread_join(send_thread, NULL);
 
   finish(NULL);
