@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zstd.h>
+// #include <zstd.h>
 
 #include "params.h"
 
