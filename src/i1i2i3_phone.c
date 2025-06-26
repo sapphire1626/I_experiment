@@ -48,6 +48,7 @@ int main(int argc, char* argv[]) {
   for (int i = 2; i < argc; i++) {
     if (argv[i][0] != '-') {
       wavfile = argv[i];
+      speaking = 1;
       continue;
     }
 
@@ -93,6 +94,10 @@ int main(int argc, char* argv[]) {
   char recv_buf[DATA_SIZE * (MAX_PORT - GATE_PORT)];
   int length_list[MAX_PORT - GATE_PORT];
   int port_list[MAX_PORT - GATE_PORT];
+  int long_life_port_list[MAX_PORT - GATE_PORT];
+  int port_life[MAX_PORT - GATE_PORT] = {0};  // ポートの生存時間
+  int long_life_num_clients = 0;
+  const int LIFE = 10000000;
   char decoded_bufs[MAX_PORT - GATE_PORT]
                    [DATA_SIZE];  // 全員のデコード済みデータ
   short* pcm_ptrs[MAX_PORT - GATE_PORT];
@@ -135,8 +140,8 @@ int main(int argc, char* argv[]) {
       } else if (strncmp(cmd_buf, "list", 4) == 0) {
         // ミュートポート一覧表示
         fprintf(stderr, "[PORTS LIST]");
-        for (int i = 0; i < num_clients; i++) {
-          fprintf(stderr, " %d", port_list[i]);
+        for (int i = 0; i < long_life_num_clients; i++) {
+          fprintf(stderr, " %d", long_life_port_list[i]);
         }
         fprintf(stderr, "\n");
         fflush(stderr);
@@ -144,6 +149,53 @@ int main(int argc, char* argv[]) {
     }
     // 受信
     num_clients = receiveData(recv_buf, length_list, port_list);
+
+    // 長期持続port_listの更新
+    for (int i = 0; i < num_clients; i++) {
+      const int port = port_list[i];
+      int found = 0;
+      for (int j = 0; j < long_life_num_clients; j++) {
+        if (long_life_port_list[j] == port) {
+          found = 1;
+          port_life[j] = LIFE;  // 生存時間リセット
+          break;
+        }
+      }
+      if (!found && long_life_num_clients < MAX_PORT - GATE_PORT) {
+        // 新規ポート追加
+        long_life_num_clients++;
+        long_life_port_list[long_life_num_clients - 1] = port;
+        port_life[long_life_num_clients - 1] = LIFE;
+      }
+    }
+    // 生存時間の更新
+    for (int i = 0; i < long_life_num_clients; i++) {
+      port_life[i]--;
+      if (port_life[i] <= 0) {
+        // ポートが死んだ
+        fprintf(stderr, "[PORT DEAD] port %d\n", long_life_port_list[i]);
+        fflush(stderr);
+        // ミュートポートから削除
+        for (int j = 0; j < muted_count; j++) {
+          if (muted_ports[j] == long_life_port_list[i]) {
+            for (int k = j; k < muted_count - 1; k++) {
+              // １個ずつ前に詰める
+              muted_ports[k] = muted_ports[k + 1];
+            }
+            muted_count--;
+            break;
+          }
+        }
+        // ポートリストから削除
+        for (int j = i; j < long_life_num_clients - 1; j++) {
+          // １個ずつ前に詰める
+          long_life_port_list[j] = long_life_port_list[j + 1];
+          port_life[j] = port_life[j + 1];
+        }
+        long_life_num_clients--;
+        i--;  // 削除したのでインデックスを戻す
+      }
+    }
     int max_samples = 0;
     int mix_count = 0;
     for (int i = 0; i < num_clients; i++) {
