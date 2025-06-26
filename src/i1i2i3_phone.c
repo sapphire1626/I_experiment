@@ -30,8 +30,8 @@ int is_port_muted(int port, int* muted_ports, int muted_count) {
 
 /// @param argv[1] サーバIPアドレス
 /// @param argv[2] オプションでWAVファイル名
-/// @param -m: muteオプション（音声入力をミュート）
-/// @param -h:
+/// @param -l: 音声再生を行う
+/// @param -s: 音声送信を行う
 /// holdオプション（データを送信しなくてもサーバから切断されなくなる）
 int main(int argc, char* argv[]) {
   if (argc < 2) {
@@ -41,20 +41,22 @@ int main(int argc, char* argv[]) {
 
   const char* ip_addr = argv[1];
 
-  uint8_t hold = 0;
-  uint8_t mute = 0;
+  uint8_t hold = 1;
+  uint8_t speaking = 0;
+  uint8_t listening = 0;
   for (int i = 2; i < argc; i++) {
     if (argv[i][0] != '-') {
       continue;
     }
 
     switch (argv[i][1]) {
-      case 'h':
-        hold = 1;  // -hオプションでholdを有効にする
-        break;
-      case 'm':
-        mute = 1;  // -mオプションでmuteを有効にする
+      case 'l':
+        listening = 1;
         hold = 1;
+        break;
+      case 's':
+        speaking = 1;
+        hold = 0;
         break;
       default:
         fprintf(stderr, "Unknown option: %s\n", argv[i]);
@@ -62,11 +64,16 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  if (listening == 0 && speaking == 0) {
+    fprintf(stderr, "Error: At least one of -l or -s must be specified.\n");
+    return 1;
+  }
+
   setup(ip_addr, hold);
 
   // 送信スレッド作成
   pthread_t send_thread;
-  if (mute == 0) {
+  if (speaking == 1) {
     void* arg = NULL;
     if (argc == 3) {
       arg = argv[2];
@@ -97,7 +104,7 @@ int main(int argc, char* argv[]) {
   int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
   fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
 
-  while (1) {
+  while (listening == 1) {
     // --- コマンド入力監視 ---
     char cmd_buf[64];
     if (fgets(cmd_buf, sizeof(cmd_buf), stdin)) {

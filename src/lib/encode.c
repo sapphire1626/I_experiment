@@ -210,14 +210,14 @@ int decode(const char* input, int input_len, char* output) {
 // }
 
 void mixing(short** bufs, int n, int len, short* out) {
-    for (int j = 0; j < len; j++) {
-        int sum = 0;
-        for (int i = 0; i < n; i++) {
-            sum += bufs[i][j];
-        }
-        int v = sum / n;
-        if (v > 32767) v = 32767;
-        if (v < -32768) v = -32768;
-        out[j] = (short)v;
+  for (int j = 0; j < len; j++) {
+    int sum = 0;
+    for (int i = 0; i < n; i++) {
+      sum += bufs[i][j];
     }
+    int v = sum / n;
+    if (v > 32767) v = 32767;
+    if (v < -32768) v = -32768;
+    out[j] = (short)v;
+  }
 }
